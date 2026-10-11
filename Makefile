@@ -8,11 +8,12 @@ LOCAL_DATABASE_PORT ?= 5432
 
 export PORT LOCAL_DATABASE_PORT
 
-.PHONY: help install db-up db-down db-logs docker-up db-ui dev dev-backend rebuild-frontend
+.PHONY: help install test db-up db-down db-logs docker-up db-ui dev dev-backend rebuild-frontend
 
 help:
 	@printf '%s\n' \
 	  'make install       Install Python and frontend dependencies' \
+	  'make test          Run backend tests' \
 	  'make docker-up     Start PostgreSQL and pgAdmin' \
 	  'make db-up         Start the local PostgreSQL container' \
 	  'make db-down       Stop all Docker containers (keep their data)' \
@@ -24,6 +25,9 @@ help:
 install:
 	uv sync --project "$(CURDIR)" --package clubs
 	cd frontend && npm ci
+
+test:
+	uv run --project "$(CURDIR)" python -m pytest
 
 docker-up:
 	docker compose up --detach --wait
