@@ -1,0 +1,37 @@
+.club-list-page { padding-top: 18px; }
+.club-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.club-list-heading h1 { margin: 9px 0 0; color: #30362e; font: 500 clamp(30px, 3.2vw, 42px)/1.15 var(--serif); letter-spacing: -1px; }
+.club-create-form { display: grid; gap: 16px; max-width: 640px; margin: 0 0 25px; padding: 21px; border: 1px solid #e9e8e0; border-radius: 12px; background: #fff; }
+.club-create-form-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.club-create-form-heading h2 { margin: 0; color: #3d4239; font: 500 21px/1.2 var(--serif); }
+.club-form-field { display: grid; gap: 7px; color: #6f7369; font-size: 11px; font-weight: 600; }
+.club-form-field input, .club-form-field select { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #e1e2d9; border-radius: 8px; color: #42463d; background: #fff; font: inherit; font-size: 12px; }
+.club-public-toggle { display: flex; align-items: start; gap: 10px; color: #50554b; cursor: pointer; }
+.club-public-toggle > input { margin: 3px 0 0; accent-color: #617b64; }
+.club-public-toggle > span { display: grid; gap: 4px; }
+.club-public-toggle strong { font-size: 12px; font-weight: 600; }
+.club-public-toggle small { color: #8a8d83; font-size: 10px; }
+.club-form-error, .club-list-error { margin: 0; color: #a55e4c; font-size: 12px; }
+.club-record-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.club-record-card { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 13px; border: 1px solid #eeece7; border-radius: 11px; background: #fff; }
+.club-record-avatar { width: 62px; height: 62px; flex: 0 0 auto; border-radius: 9px; object-fit: cover; }
+.club-record-avatar-placeholder { display: grid; place-items: center; color: #648066; background: #e8eee4; }
+.club-record-info { display: grid; gap: 8px; min-width: 0; }
+.club-record-info h2 { overflow: hidden; margin: 0; color: #44483f; font: 500 16px/1.25 var(--serif); text-overflow: ellipsis; }
+.club-type-label { color: #96978e; font-size: 10px; }
+.club-visibility { display: inline-flex; align-items: center; gap: 5px; color: #85897e; font-size: 10px; }
+.club-list-empty { display: grid; justify-items: center; gap: 10px; padding: 50px 20px; border: 1px dashed #deded4; border-radius: 12px; color: #7b8974; background: #ffffff80; }
+.club-list-empty p { margin: 0; color: #83867d; font-size: 12px; }
+.club-list-loading { margin: 24px 0; color: #898c82; text-align: center; font-size: 11px; }
+.club-load-more { display: flex; margin: 22px auto; }
+.club-list-sentinel { height: 1px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 1000px) { .club-record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) {
+  .club-list-page { padding-top: 5px; }
+  .club-list-heading { align-items: start; }
+  .club-list-heading > .button { flex: 0 0 auto; padding: 10px; font-size: 0; }
+  .club-list-heading > .button svg { width: 18px; height: 18px; }
+  .club-record-grid { grid-template-columns: 1fr; }
+}

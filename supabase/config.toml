@@ -1,0 +1,7 @@
+project_id = "clubs"
+
+[auth.external.google]
+enabled = true
+client_id = "818970767944-5kutq0jf4fosaljpn8u9gm1af0ahdih9.apps.googleusercontent.com"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET)"
+skip_nonce_check = false

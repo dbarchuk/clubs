@@ -1,0 +1,175 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
+
+:root {
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  color: #4c4f46;
+  background: #f7f6f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --serif: 'DM Serif Display', Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, a { font: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid #789276; outline-offset: 3px; }
+::selection { color: #344536; background: #dce6d7; }
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  color: #e4e8df;
+  background: #151815;
+}
+
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .app-shell,
+:root[data-theme='dark'] .main-content,
+:root[data-theme='dark'] .login-page {
+  color: #e4e8df;
+  background: #151815;
+}
+
+:root[data-theme='dark'] .sidebar,
+:root[data-theme='dark'] .topbar,
+:root[data-theme='dark'] .login-card,
+:root[data-theme='dark'] .profile-card,
+:root[data-theme='dark'] .profile-detail,
+:root[data-theme='dark'] .profile-form,
+:root[data-theme='dark'] .club-card,
+:root[data-theme='dark'] .stat-card {
+  background-color: #202520;
+  border-color: #353d35;
+}
+
+:root[data-theme='dark'] .club-create-form,
+:root[data-theme='dark'] .club-record-card,
+:root[data-theme='dark'] .club-search {
+  color: #e4e8df;
+  background-color: #202520;
+  border-color: #353d35;
+}
+:root[data-theme='dark'] .topbar-search {
+  color: #a8baa4;
+  background: #252e26;
+  border-color: #3d4a3f;
+  box-shadow: inset 0 1px 2px #0b100c66, 0 2px 8px #0b100c26;
+}
+:root[data-theme='dark'] .topbar-search:focus-within {
+  border-color: #718b70;
+  box-shadow: 0 0 0 2px #718b702e, 0 3px 10px #0b100c33;
+}
+:root[data-theme='dark'] .topbar-search input { color: #e4e8df; }
+:root[data-theme='dark'] .topbar-search input::placeholder { color: #a3ae9f; }
+:root[data-theme='dark'] .topbar-search button { background: #617b64; }
+:root[data-theme='dark'] .topbar-search button:hover { background: #526e56; }
+:root[data-theme='dark'] .club-list-heading h1,
+:root[data-theme='dark'] .club-create-form-heading h2,
+:root[data-theme='dark'] .club-record-info h2,
+:root[data-theme='dark'] .club-public-toggle { color: #e4e8df; }
+:root[data-theme='dark'] .club-search input,
+:root[data-theme='dark'] .club-form-field input,
+:root[data-theme='dark'] .club-form-field select { color: #e4e8df; background: #171c18; border-color: #424b42; }
+:root[data-theme='dark'] .club-visibility,
+:root[data-theme='dark'] .club-type-label,
+:root[data-theme='dark'] .club-public-toggle small,
+:root[data-theme='dark'] .club-list-empty p { color: #a9b2a7; }
+:root[data-theme='dark'] .club-record-avatar-placeholder { color: #d0e0c9; background: #384737; }
+
+:root[data-theme='dark'] .topbar { background-color: #1c211d; }
+:root[data-theme='dark'] .brand,
+:root[data-theme='dark'] .profile-info h2,
+:root[data-theme='dark'] .profile-field span:last-child,
+:root[data-theme='dark'] .inner-heading h1,
+:root[data-theme='dark'] .welcome-page h1,
+:root[data-theme='dark'] .welcome-row h1,
+:root[data-theme='dark'] .section-heading h2,
+:root[data-theme='dark'] .detail-info h1,
+:root[data-theme='dark'] .login-header h1,
+:root[data-theme='dark'] .form-group label,
+:root[data-theme='dark'] .breadcrumb strong,
+:root[data-theme='dark'] .profile-row strong,
+:root[data-theme='dark'] .stat-card strong {
+  color: #e4e8df;
+}
+
+:root[data-theme='dark'] .workspace-label,
+:root[data-theme='dark'] .nav-link,
+:root[data-theme='dark'] .breadcrumb,
+:root[data-theme='dark'] .profile-info p,
+:root[data-theme='dark'] .profile-label,
+:root[data-theme='dark'] .profile-empty,
+:root[data-theme='dark'] .welcome-page p,
+:root[data-theme='dark'] .welcome-copy,
+:root[data-theme='dark'] .login-header p,
+:root[data-theme='dark'] .form-group label,
+:root[data-theme='dark'] .profile-row span,
+:root[data-theme='dark'] .profile-field span:first-child,
+:root[data-theme='dark'] .page-state,
+:root[data-theme='dark'] .stat-card span:not(.stat-icon) {
+  color: #a9b2a7;
+}
+
+:root[data-theme='dark'] .nav-link:hover,
+:root[data-theme='dark'] .nav-link.active {
+  color: #c3d6bf;
+  background: #2b352c;
+}
+
+:root[data-theme='dark'] .profile-field,
+:root[data-theme='dark'] .topbar,
+:root[data-theme='dark'] .login-footer {
+  border-color: #353d35;
+}
+
+:root[data-theme='dark'] .form-group input,
+:root[data-theme='dark'] .form-group textarea {
+  color: #e4e8df;
+  background: #171c18;
+  border-color: #424b42;
+}
+
+:root[data-theme='dark'] .form-group input::placeholder,
+:root[data-theme='dark'] .form-group textarea::placeholder {
+  color: #929c91;
+}
+
+:root[data-theme='dark'] .theme-switcher,
+:root[data-theme='dark'] .language-menu summary,
+:root[data-theme='dark'] .language-menu-options,
+:root[data-theme='dark'] .button-google {
+  color: #e4e8df;
+  background: #202520;
+  border-color: #424b42;
+}
+
+:root[data-theme='dark'] .language-menu-options button:hover,
+:root[data-theme='dark'] .language-menu-options button[aria-pressed='true'] { background: #2b352c; }
+:root[data-theme='dark'] .theme-switcher { color: #d2ded0; }
+:root[data-theme='dark'] .theme-switcher:hover { color: #fff; background: #2b352c; }
+
+:root[data-theme='dark'] .button-google:hover:not(:disabled) { background: #2b332c; }
+:root[data-theme='dark'] .button-light { color: #c3d6bf; background: #202520; }
+:root[data-theme='dark'] .profile-role { color: #c3d6bf; background: #2b352c; }
+:root[data-theme='dark'] .profile-avatar-large:not(img) { color: #d0e0c9; background: #384737; }
+:root[data-theme='dark'] .app-shell .text-link,
+:root[data-theme='dark'] .login-page .text-link {
+  color: #fff;
+  background: #617b64;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+:root[data-theme='dark'] .app-shell .text-link:hover,
+:root[data-theme='dark'] .login-page .text-link:hover { color: #fff; background: #526e56; }
+:root[data-theme='dark'] .bottom-note,
+:root[data-theme='dark'] .invite-card { background: #252e26; }
+:root[data-theme='dark'] .bottom-note strong,
+:root[data-theme='dark'] .bottom-note span,
+:root[data-theme='dark'] .invite-card strong,
+:root[data-theme='dark'] .invite-card p { color: #d0d9ce; }
+:root[data-theme='dark'] .form-error { color: #f0aaa0; background: #392522; }
+:root[data-theme='dark'] .empty-state,
+:root[data-theme='dark'] .club-list-empty { background: #202520; border-color: #353d35; }
+:root[data-theme='dark'] .profile-name-link:hover strong { color: #c3d6bf; }
+:root[data-theme='dark'] ::selection { color: #f1f5ee; background: #465847; }

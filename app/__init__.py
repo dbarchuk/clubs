@@ -1,0 +1,1 @@
+"""Clubs FastAPI application."""
