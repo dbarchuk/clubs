@@ -10,8 +10,8 @@ Group=clubs
 WorkingDirectory=/opt/clubs
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStartPre=/opt/clubs/.venv/bin/alembic upgrade head
-ExecStart=/opt/clubs/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStartPre=/usr/local/bin/uv run --project /opt/clubs --no-sync alembic upgrade head
+ExecStart=/usr/local/bin/uv run --project /opt/clubs --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30

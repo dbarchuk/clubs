@@ -92,7 +92,7 @@ sudo systemctl enable --now clubs
 sudo systemctl status clubs
 ```
 
-The unit runs `alembic upgrade head` before starting the app. After deploying code, rebuild the frontend if needed and restart with `sudo systemctl restart clubs`. View service logs with `sudo journalctl -u clubs -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
+The unit runs `uv run ... alembic upgrade head` before starting the app and uses `uv run` for Uvicorn as well. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` when deploying code. After deploying code, rebuild the frontend if needed and restart with `sudo systemctl restart clubs`. View service logs with `sudo journalctl -u clubs -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
 
 Migration revisions are numbered sequentially and use Alembic's lowercase underscore slug, for example `00001_initial_migration.py`.
 
