@@ -53,35 +53,34 @@ uv run pre-commit run --all-files
 
 ## Deploy on a Google Cloud VM
 
-The production service uses systemd and Uvicorn directly; Docker is not required. This configuration assumes an Ubuntu VM, the application is checked out at `/opt/clubs`, and PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
+The production service uses systemd and Uvicorn directly; Docker is not required. The checked-in service file is configured for your Ubuntu VM login `dvbarchuk` and checkout path `/home/dvbarchuk/opt/clubs`; adjust those values if your VM username or checkout path differs. PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
 
-Install Node.js and [uv](https://docs.astral.sh/uv/) on the VM. The service account needs `uv` outside your home directory, so install the existing binary system-wide. Use uv to install Python 3.13. Create a dedicated service account and check out the application:
+Install Node.js and [uv](https://docs.astral.sh/uv/) on the VM. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
 
 ```sh
-sudo useradd --system --home /opt/clubs --shell /usr/sbin/nologin clubs
-sudo install -d -o clubs -g clubs /opt/clubs
 sudo install -m 0755 "$(command -v uv)" /usr/local/bin/uv
-sudo -u clubs git clone <repository-url> /opt/clubs
 ```
 
 Install production dependencies and build the frontend with the production Supabase public settings:
 
 ```sh
-cd /opt/clubs
-sudo -u clubs /usr/local/bin/uv python install 3.13
-sudo -u clubs /usr/local/bin/uv sync --no-dev
-sudo -u clubs sh -c 'cd frontend && npm ci && VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key npm run build'
+cd ~/opt/clubs
+uv python install 3.13
+uv sync --no-dev
+cd frontend
+npm ci
+VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key npm run build
+cd ..
 ```
 
 Create the project-root `.env` from [.env.example](.env.example) and fill in production values. The app and Alembic load this file from the project root. Keep it private and make sure the systemd service user can read it:
 
 ```sh
-sudo cp .env.example .env
-sudo chown clubs:clubs .env
-sudo chmod 600 .env
+cp .env.example .env
+chmod 600 .env
 ```
 
-If you configure the unit to run as your VM login instead of `clubs`, use that account as the owner in the `chown` command.
+The project `.env` must be owned by `dvbarchuk` so the service can read it.
 
 Install and start the systemd unit:
 
@@ -90,6 +89,13 @@ sudo install -m 0644 deploy/clubs.service /etc/systemd/system/clubs.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now clubs
 sudo systemctl status clubs
+```
+
+If systemd has rate-limited retries after a failed start, clear that state before restarting:
+
+```sh
+sudo systemctl reset-failed clubs
+sudo systemctl restart clubs
 ```
 
 The unit runs `uv run ... alembic upgrade head` before starting the app and uses `uv run` for Uvicorn as well. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` when deploying code. After deploying code, rebuild the frontend if needed and restart with `sudo systemctl restart clubs`. View service logs with `sudo journalctl -u clubs -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.

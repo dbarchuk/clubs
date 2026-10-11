@@ -5,15 +5,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=clubs
-Group=clubs
-WorkingDirectory=/opt/clubs
+User=dvbarchuk
+Group=dvbarchuk
+WorkingDirectory=/home/dvbarchuk/opt/clubs
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=UV_CACHE_DIR=/var/cache/clubs/uv
 CacheDirectory=clubs
-ExecStartPre=/usr/local/bin/uv run --project /opt/clubs --no-sync alembic upgrade head
-ExecStart=/usr/local/bin/uv run --project /opt/clubs --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStartPre=/usr/local/bin/uv run --project /home/dvbarchuk/opt/clubs --no-sync alembic upgrade head
+ExecStart=/usr/local/bin/uv run --project /home/dvbarchuk/opt/clubs --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
@@ -21,7 +21,7 @@ UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=true
+ProtectHome=read-only
 
 [Install]
 WantedBy=multi-user.target
