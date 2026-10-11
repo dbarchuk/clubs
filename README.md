@@ -71,6 +71,7 @@ cd frontend
 npm ci
 VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key npm run build
 cd ..
+test -f frontend/dist/index.html
 ```
 
 Create the project-root `.env` from [.env.example](.env.example) and fill in production values. The app and Alembic load this file from the project root. Keep it private and make sure the systemd service user can read it:
