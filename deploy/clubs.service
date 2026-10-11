@@ -1,0 +1,25 @@
+[Unit]
+Description=Clubs FastAPI application
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=clubs
+Group=clubs
+WorkingDirectory=/opt/clubs
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStartPre=/opt/clubs/.venv/bin/alembic upgrade head
+ExecStart=/opt/clubs/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
