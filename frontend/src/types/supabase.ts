@@ -19,6 +19,30 @@ export interface ClubRecord {
   created_by: string
   created_at: string
   updated_at: string
+  my_access_type: 'owner' | 'admin' | 'moderator' | 'member' | null
+}
+
+export interface InviteCodeResponse {
+  id: string
+  code: string | null
+  created_at: string
+  revoked_at: string | null
+}
+
+export interface InviteCodeCreated extends InviteCodeResponse {
+  code: string
+}
+
+export interface ClubDeletionRequest {
+  id: string
+  club_id: string
+  club_title: string
+  requested_by: string
+  requester_display_name: string
+  requested_at: string
+  status: 'pending' | 'approved' | 'rejected'
+  reviewed_by: string | null
+  reviewed_at: string | null
 }
 
 export interface PaginatedClubs {

@@ -2,8 +2,10 @@ import { useAuth } from './lib/auth-context'
 import { LoginPage } from './pages/LoginPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ClubListPage } from './pages/ClubListPage'
+import { ClubDeletionRequestsPage } from './pages/ClubDeletionRequestsPage'
+import { ClubManagementPage } from './pages/ClubManagementPage'
 import mainIcon from './assets/main_icon.png'
-import { Users, Globe2, LogOut, Search } from 'lucide-react'
+import { Users, Globe2, LogOut, Search, ShieldCheck } from 'lucide-react'
 import { Link, NavLink, Routes, Route } from 'react-router-dom'
 import { useState, type FormEvent } from 'react'
 import { useI18n } from './lib/i18n-context'
@@ -49,6 +51,11 @@ function App() {
           <NavLink to="/public-clubs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <Globe2 size={18} aria-hidden="true" /> <span>{t('publicClubs')}</span>
           </NavLink>
+          {profile?.is_admin && (
+            <NavLink to="/club-deletion-requests" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              <ShieldCheck size={18} aria-hidden="true" /> <span>{t('clubDeletionRequests')}</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="sidebar-bottom">
@@ -105,6 +112,8 @@ function App() {
             />
             <Route path="/my-clubs" element={<ClubListPage key="my-clubs" scope="my" searchQuery={searchQuery} />} />
             <Route path="/public-clubs" element={<ClubListPage key="public-clubs" scope="public" searchQuery={searchQuery} />} />
+            <Route path="/clubs/:clubId/manage" element={<ClubManagementPage />} />
+            <Route path="/club-deletion-requests" element={<ClubDeletionRequestsPage />} />
             <Route path="/me" element={<ProfilePage />} />
             <Route path="*" element={<section className="welcome-page"><h1>404</h1></section>} />
           </Routes>

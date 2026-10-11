@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState, type FormEvent } from 'react'
 import { BookOpen, Dice5, Dumbbell, Film, Globe2, LockKeyhole, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
 import { useI18n } from '../lib/i18n-context'
 import type { ClubRecord, PaginatedClubs } from '../types/supabase'
@@ -46,6 +47,12 @@ export function ClubListPage({ scope, searchQuery }: ClubListPageProps) {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const [form, setForm] = useState<CreateClubForm>({ clubType: 'book', title: '', avatarUrl: '', isPublic: false })
+  const [inviteCode, setInviteCode] = useState('')
+  const [showJoinPrivate, setShowJoinPrivate] = useState(false)
+  const [joiningClubId, setJoiningClubId] = useState('')
+  const [clubErrors, setClubErrors] = useState<Record<string, string>>({})
+  const [pageNotice, setPageNotice] = useState('')
+  const [privateJoinError, setPrivateJoinError] = useState('')
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const requestInFlightRef = useRef(false)
   const pageRef = useRef(0)
@@ -158,6 +165,63 @@ export function ClubListPage({ scope, searchQuery }: ClubListPageProps) {
     }
   }
 
+  const handlePublicJoin = async (clubId: string) => {
+    if (!accessToken) return
+    setJoiningClubId(clubId)
+    setClubErrors((current) => ({ ...current, [clubId]: '' }))
+    try {
+      const response = await fetch(`/api/clubs/${clubId}/join`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response, t('couldNotJoinClub')))
+      setPageNotice(t('joinedClub'))
+      setClubs((current) => current.filter((club) => club.id !== clubId))
+    } catch (joinError) {
+      setClubErrors((current) => ({
+        ...current,
+        [clubId]: joinError instanceof Error ? joinError.message : t('couldNotJoinClub'),
+      }))
+    } finally {
+      setJoiningClubId('')
+    }
+  }
+
+  const handlePrivateJoin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!accessToken) {
+      setPrivateJoinError(t('sessionExpired'))
+      return
+    }
+    setJoiningClubId('private')
+    setPrivateJoinError('')
+    try {
+      const response = await fetch('/api/clubs/join-private', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ invite_code: inviteCode.trim() }),
+      })
+      if (!response.ok) throw new Error(await getErrorMessage(response, t('couldNotJoinClub')))
+      setInviteCode('')
+      setShowJoinPrivate(false)
+      setPageNotice(t('joinedPrivateClub'))
+      pageRef.current = 0
+      hasMoreRef.current = true
+      setClubs([])
+      setHasMore(true)
+      setLoading(true)
+      setError('')
+      void loadPage(1, searchRef.current, true)
+    } catch (joinError) {
+      setPrivateJoinError(joinError instanceof Error ? joinError.message : t('couldNotJoinClub'))
+    } finally {
+      setJoiningClubId('')
+    }
+  }
+
   const clubTypeDetails = {
     movie: { title: t('movieClubs'), icon: Film },
     book: { title: t('bookClubs'), icon: BookOpen },
@@ -175,16 +239,54 @@ export function ClubListPage({ scope, searchQuery }: ClubListPageProps) {
           <h1 id="club-list-title">{title}</h1>
         </div>
         {scope === 'my' && (
+          <div className="club-list-actions">
+            <button className="button button-light" type="button" onClick={() => { setPrivateJoinError(''); setShowJoinPrivate(true) }}>
+              <LockKeyhole size={15} aria-hidden="true" /> {t('joinPrivateClub')}
+            </button>
+            <button
+              className="button button-primary"
+              type="button"
+              aria-label={t('createClub')}
+              onClick={() => { setCreateError(''); setShowCreateForm((visible) => !visible) }}
+            >
+              <Plus size={16} aria-hidden="true" /> {t('createClub')}
+            </button>
+          </div>
+        )}
+        {scope === 'public' && (
           <button
-            className="button button-primary"
+            className="button button-light"
             type="button"
-            aria-label={t('createClub')}
-            onClick={() => { setCreateError(''); setShowCreateForm((visible) => !visible) }}
+            onClick={() => {
+              setPrivateJoinError('')
+              setShowJoinPrivate((visible) => !visible)
+            }}
           >
-            <Plus size={16} aria-hidden="true" /> {t('createClub')}
+            <LockKeyhole size={15} aria-hidden="true" /> {t('joinPrivateClub')}
           </button>
         )}
       </div>
+
+      {showJoinPrivate && (
+        <div className="club-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowJoinPrivate(false) }}>
+          <form className="club-join-modal" role="dialog" aria-modal="true" aria-labelledby="join-private-title" onSubmit={(event) => void handlePrivateJoin(event)}>
+            <div className="club-create-form-heading">
+              <h2 id="join-private-title">{t('joinPrivateClub')}</h2>
+              <button type="button" className="text-link" onClick={() => setShowJoinPrivate(false)}>{t('cancel')}</button>
+            </div>
+            <label className="club-form-field">
+              <span>{t('inviteCode')}</span>
+              <input required minLength={8} maxLength={8} value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} autoComplete="off" />
+            </label>
+            {privateJoinError && <p className="club-form-error" role="alert">{privateJoinError}</p>}
+            <button className="button button-primary" type="submit" disabled={joiningClubId === 'private'}>
+              {joiningClubId === 'private' ? t('loading') : t('joinClub')}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {pageNotice && <p className="club-list-notice" role="status">{pageNotice}</p>}
 
       {showCreateForm && (
         <form className="club-create-form" onSubmit={(event) => void handleCreate(event)}>
@@ -264,12 +366,25 @@ export function ClubListPage({ scope, searchQuery }: ClubListPageProps) {
                 </div>
               )}
               <div className="club-record-info">
-                <h2>{club.title}</h2>
+                <h2>{scope === 'my' ? <Link to={`/clubs/${club.id}/manage`}>{club.title}</Link> : club.title}</h2>
                 <span className="club-type-label">{clubTypeDetails[club.club_type].title}</span>
                 <span className="club-visibility">
                   {club.is_public ? <Globe2 size={13} aria-hidden="true" /> : <LockKeyhole size={13} aria-hidden="true" />}
                   {club.is_public ? t('publicLabel') : t('privateLabel')}
                 </span>
+                {scope === 'public' && club.is_public && (
+                  <>
+                  <button
+                    className="button button-primary club-card-action"
+                    type="button"
+                    disabled={joiningClubId === club.id}
+                    onClick={() => void handlePublicJoin(club.id)}
+                  >
+                    {joiningClubId === club.id ? t('loading') : t('joinClub')}
+                  </button>
+                  {clubErrors[club.id] && <p className="club-form-error" role="alert">{clubErrors[club.id]}</p>}
+                  </>
+                )}
               </div>
             </article>
           )

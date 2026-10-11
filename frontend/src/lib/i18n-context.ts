@@ -19,6 +19,16 @@ export type TranslationKey =
   | 'publicClub' | 'publicClubHelp' | 'privateClub' | 'privateClubHelp'
   | 'noClubsFound' | 'couldNotLoadClubs' | 'couldNotCreateClub' | 'loadingMore' | 'loadMoreClubs'
   | 'publicLabel' | 'privateLabel'
+  | 'joinPrivateClub' | 'inviteCode' | 'joinClub' | 'joinedClub' | 'joinedPrivateClub'
+  | 'couldNotJoinClub' | 'manageInviteCode' | 'hideInviteCode' | 'createInviteCode'
+  | 'revokeInviteCode' | 'inviteCodeCreated' | 'inviteCodeShownOnce' | 'inviteCodeActive'
+  | 'inviteCodeRevoked' | 'inviteCodeFailed' | 'deleteClub' | 'confirmDeleteClub'
+  | 'deletionRequestCreated' | 'couldNotDeleteClub' | 'clubDeleted' | 'clubDeletionRequests'
+  | 'noDeletionRequests' | 'deletionRequestClub' | 'requestedBy'
+  | 'approveDeletionRequest' | 'rejectDeletionRequest' | 'couldNotLoadDeletionRequests'
+  | 'couldNotReviewDeletionRequest' | 'clubManagement' | 'editClub' | 'saveClubChanges'
+  | 'clubUpdated' | 'couldNotLoadClub' | 'couldNotUpdateClub' | 'backToMyClubs' | 'clubManagerOnly'
+  | 'copyInviteCode' | 'inviteCodeCopied' | 'inviteCodeCopyFailed' | 'inviteCodeNeedsReplacement'
 
 export interface I18nContextValue {
   language: Language

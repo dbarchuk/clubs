@@ -1,0 +1,6 @@
+.club-management-page { display: grid; gap: 1.5rem; max-width: 760px; }
+.club-management-page header { display: grid; gap: .4rem; }
+.club-management-page header p { margin: 0; color: var(--muted); }
+.club-management-page h1, .club-management-page h2 { margin: 0; }
+.club-management-back { width: fit-content; }
+.club-management-delete { display: grid; justify-items: start; gap: .75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
