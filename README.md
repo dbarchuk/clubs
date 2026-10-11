@@ -37,6 +37,20 @@ uv run alembic revision --autogenerate -m "describe schema change"
 uv run alembic upgrade head
 ```
 
+## Pre-commit
+
+Install the Git hook after running `make install`:
+
+```sh
+uv run pre-commit install
+```
+
+On each commit, the hook runs `ruff check --fix` on staged Python files and applies safe fixes. Review and stage any changes Ruff makes before committing. To run it manually on all Python files:
+
+```sh
+uv run pre-commit run --all-files
+```
+
 Migration revisions are numbered sequentially and use Alembic's lowercase underscore slug, for example `00001_initial_migration.py`.
 
 Start the local PostgreSQL container, FastAPI, and the Vite frontend together:

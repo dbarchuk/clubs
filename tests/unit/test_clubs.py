@@ -104,17 +104,46 @@ def test_private_club_requires_active_single_invite_code(
         json={"invite_code": "Z" * 8},
         headers=headers,
     )
+    malformed_join = client.post(
+        "/api/clubs/join-private",
+        json={"invite_code": "O0IL1234"},
+        headers=headers,
+    )
     valid_join = client.post(
         "/api/clubs/join-private",
         json={"invite_code": code_data["code"]},
         headers=headers,
     )
     assert invalid_join.status_code == 404
+    assert malformed_join.status_code == 422
     assert valid_join.status_code == 200
     assert valid_join.json() == {
         "club_id": private_club["id"],
         "already_member": False,
     }
+    duplicate_join = client.post(
+        "/api/clubs/join-private",
+        json={"invite_code": code_data["code"]},
+        headers=headers,
+    )
+    assert duplicate_join.status_code == 200
+    assert duplicate_join.json() == {
+        "club_id": private_club["id"],
+        "already_member": True,
+    }
+    with test_session_factory() as session:
+        invitee = session.scalar(
+            select(Profile).where(Profile.user_id == "invitee-user")
+        )
+        assert invitee is not None
+        memberships = session.scalars(
+            select(ClubMember).where(
+                ClubMember.club_id == private_club["id"],
+                ClubMember.user_id == invitee.id,
+            )
+        ).all()
+        assert len(memberships) == 1
+        assert memberships[0].access_type.value == "member"
 
     authenticate_as("private-owner", "private-owner@example.com")
     revoke_code = client.delete(
@@ -130,6 +159,13 @@ def test_private_club_requires_active_single_invite_code(
         headers=headers,
     )
     assert revoked_join.status_code == 404
+
+    authenticate_as("private-owner", "private-owner@example.com")
+    replacement = client.post(
+        f"/api/clubs/{private_club['id']}/invite-codes", headers=headers
+    )
+    assert replacement.status_code == 201
+    assert replacement.json()["code"] != code_data["code"]
 
     with test_session_factory() as session:
         saved_code = session.get(ClubInviteCode, code_data["id"])
@@ -179,6 +215,32 @@ def test_only_club_owner_or_admin_can_manage_invite_codes(
         f"/api/clubs/{private_club['id']}/invite-codes", headers=headers
     )
     assert allowed.status_code == 201
+
+
+def test_private_club_membership_requires_invite_and_private_details_are_hidden(
+    client: TestClient,
+) -> None:
+    headers = {"Authorization": "Bearer test"}
+    authenticate_as("membership-owner", "owner@example.com")
+    private_club = create_club(client, is_public=False)
+    code = client.post(
+        f"/api/clubs/{private_club['id']}/invite-codes", headers=headers
+    ).json()["code"]
+
+    authenticate_as("membership-outsider", "outsider@example.com")
+    client.get("/api/users/me", headers=headers)
+    assert client.get(f"/api/clubs/{private_club['id']}", headers=headers).status_code == 404
+    assert client.get(
+        f"/api/clubs/{private_club['id']}/invite-codes", headers=headers
+    ).status_code == 403
+
+    joined = client.post(
+        "/api/clubs/join-private", json={"invite_code": code}, headers=headers
+    )
+    assert joined.status_code == 200
+    visible = client.get(f"/api/clubs/{private_club['id']}", headers=headers)
+    assert visible.status_code == 200
+    assert visible.json()["my_access_type"] == "member"
 
 
 def test_owner_can_soft_delete_public_club_without_other_members(

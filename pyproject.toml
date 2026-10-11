@@ -16,4 +16,8 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=8.0",
+    "ruff>=0.15.15",
+]
