@@ -10,6 +10,7 @@ Group=%i
 WorkingDirectory=/home/%i/opt/clubs
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PATH=/home/%i/.nvm/versions/node/v24.21.0/bin:/usr/local/bin:/usr/bin:/bin
 Environment=UV_CACHE_DIR=/var/cache/clubs/uv
 CacheDirectory=clubs
 ExecStartPre=/usr/local/bin/uv run --project /home/%i/opt/clubs --no-sync alembic upgrade head

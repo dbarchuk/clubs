@@ -55,7 +55,7 @@ uv run pre-commit run --all-files
 
 The production service uses systemd and Uvicorn directly; Docker is not required. The systemd template uses the service instance name as its Linux user and expects the checkout at `/home/<user>/opt/clubs`. Set `CLUBS_USER` to the VM login when enabling the service. `EnvironmentFile` values cannot configure systemd's `User=`, `Group=`, or `WorkingDirectory=` directives, so the account is selected through the template instance. PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
 
-Install Node.js with npm and [uv](https://docs.astral.sh/uv/) on the VM. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
+Install Node.js with npm through NVM at `/home/$CLUBS_USER/.nvm/versions/node/v24.21.0` and [uv](https://docs.astral.sh/uv/) on the VM. The systemd unit adds that Node.js bin directory to its `PATH`; update the path in `deploy/clubs@.service` if you change Node.js versions. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
 
 ```sh
 sudo install -m 0755 "$(command -v uv)" /usr/local/bin/uv
@@ -105,6 +105,16 @@ sudo systemctl restart "clubs@${CLUBS_USER}.service"
 ```
 
 On every service start, systemd runs the Alembic migrations and rebuilds the frontend with `npm run build` before starting Uvicorn. The build reads `frontend/.env`, so keep the production Supabase URL and publishable key there; these are public values embedded in the browser app. The unit is allowed to write only to the frontend build output and TypeScript's temporary build cache. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` and `cd frontend && npm ci && mkdir -p dist node_modules/.tmp` when deploying code. Restart the service after deploying to apply the backend and frontend changes: `sudo systemctl restart "clubs@${CLUBS_USER}.service"`. View service logs with `sudo journalctl -u "clubs@${CLUBS_USER}.service" -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
+
+If you change the service unit, reload systemd and restart the instance:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl reset-failed "clubs@${CLUBS_USER}.service"
+sudo systemctl restart "clubs@${CLUBS_USER}.service"
+```
+
+View service logs with `sudo journalctl -u "clubs@${CLUBS_USER}.service" -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
 
 Migration revisions are numbered sequentially and use Alembic's lowercase underscore slug, for example `00001_initial_migration.py`.
 
