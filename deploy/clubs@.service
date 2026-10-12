@@ -14,7 +14,7 @@ Environment=PATH=/home/%i/.nvm/versions/node/v24.21.0/bin:/usr/local/bin:/usr/bi
 Environment=UV_CACHE_DIR=/var/cache/clubs/uv
 CacheDirectory=clubs
 ExecStartPre=/usr/local/bin/uv run --project /home/%i/opt/clubs --no-sync alembic upgrade head
-ExecStartPre=npm --prefix /home/%i/opt/clubs/frontend run build
+ExecStartPre=/home/%i/.nvm/versions/node/v24.21.0/bin/npm --prefix /home/%i/opt/clubs/frontend run build
 ExecStart=/usr/local/bin/uv run --project /home/%i/opt/clubs --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=on-failure
 RestartSec=5

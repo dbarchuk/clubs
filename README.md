@@ -55,7 +55,7 @@ uv run pre-commit run --all-files
 
 The production service uses systemd and Uvicorn directly; Docker is not required. The systemd template uses the service instance name as its Linux user and expects the checkout at `/home/<user>/opt/clubs`. Set `CLUBS_USER` to the VM login when enabling the service. `EnvironmentFile` values cannot configure systemd's `User=`, `Group=`, or `WorkingDirectory=` directives, so the account is selected through the template instance. PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
 
-Install Node.js with npm through NVM at `/home/$CLUBS_USER/.nvm/versions/node/v24.21.0` and [uv](https://docs.astral.sh/uv/) on the VM. The systemd unit adds that Node.js bin directory to its `PATH`; update the path in `deploy/clubs@.service` if you change Node.js versions. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
+Install Node.js with npm through NVM at `/home/$CLUBS_USER/.nvm/versions/node/v24.21.0` and [uv](https://docs.astral.sh/uv/) on the VM. The systemd unit calls npm from that exact path; update `deploy/clubs@.service` if you change Node.js versions. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
 
 ```sh
 sudo install -m 0755 "$(command -v uv)" /usr/local/bin/uv
