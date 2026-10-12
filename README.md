@@ -73,7 +73,7 @@ cp .env.example .env
 # Edit .env with the production VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
 chmod 600 .env
 cd ..
-mkdir -p frontend/dist frontend/node_modules/.tmp
+mkdir -p frontend/dist frontend/node_modules/.tmp frontend/node_modules/.vite-temp
 ```
 
 Create the project-root `.env` from [.env.example](.env.example) and fill in production values. The app and Alembic load this file from the project root. Keep it private and make sure the systemd service user can read it:
@@ -104,7 +104,7 @@ sudo systemctl reset-failed "clubs@${CLUBS_USER}.service"
 sudo systemctl restart "clubs@${CLUBS_USER}.service"
 ```
 
-On every service start, systemd runs the Alembic migrations and rebuilds the frontend with `npm run build` before starting Uvicorn. The build reads `frontend/.env`, so keep the production Supabase URL and publishable key there; these are public values embedded in the browser app. The unit is allowed to write only to the frontend build output and TypeScript's temporary build cache. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` and `cd frontend && npm ci && mkdir -p dist node_modules/.tmp` when deploying code. Restart the service after deploying to apply the backend and frontend changes: `sudo systemctl restart "clubs@${CLUBS_USER}.service"`. View service logs with `sudo journalctl -u "clubs@${CLUBS_USER}.service" -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
+On every service start, systemd runs the Alembic migrations and rebuilds the frontend with `npm run build` before starting Uvicorn. The build reads `frontend/.env`, so keep the production Supabase URL and publishable key there; these are public values embedded in the browser app. The unit can write to the frontend build output, TypeScript's temporary cache, and Vite's temporary config directory. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` and `cd frontend && npm ci && mkdir -p dist node_modules/.tmp node_modules/.vite-temp` when deploying code. Restart the service after deploying to apply the backend and frontend changes: `sudo systemctl restart "clubs@${CLUBS_USER}.service"`. View service logs with `sudo journalctl -u "clubs@${CLUBS_USER}.service" -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
 
 If you change the service unit, reload systemd and restart the instance:
 
