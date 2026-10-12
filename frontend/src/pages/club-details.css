@@ -1,0 +1,8 @@
+.club-details-page { display: grid; gap: 1.5rem; padding-top: 18px; }
+.club-details-header { display: flex; align-items: center; gap: 18px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.club-details-header > img { width: 76px; height: 76px; border-radius: 10px; object-fit: cover; }
+.club-details-header > div { display: grid; flex: 1; gap: 5px; }
+.club-details-header p { margin: 0; color: var(--muted); }
+.club-details-header h1 { margin: 0; font: 500 clamp(28px, 3vw, 40px)/1.15 var(--serif); }
+.club-details-header > div > span { color: var(--muted); font-size: 12px; }
+@media (max-width: 600px) { .club-details-header { flex-wrap: wrap; } .club-details-header > .button { width: 100%; justify-content: center; } }

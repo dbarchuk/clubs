@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
 import { useI18n } from '../lib/i18n-context'
 import { InviteCodeManagement } from '../clubs/InviteCodeManagement'
+import { ClubMemberManagement } from '../clubs/ClubMemberManagement'
 import type { ClubRecord } from '../types/supabase'
 import './club-management.css'
 
@@ -18,7 +19,7 @@ async function responseError(response: Response, fallback: string): Promise<stri
 
 export function ClubManagementPage() {
   const { clubId } = useParams()
-  const { session } = useAuth()
+  const { session, profile } = useAuth()
   const { t } = useI18n()
   const accessToken = session?.access_token
   const [club, setClub] = useState<ClubRecord | null>(null)
@@ -53,9 +54,6 @@ export function ClubManagementPage() {
     })()
     return () => { cancelled = true }
   }, [accessToken, clubId, t])
-
-  const canManage = club?.my_access_type === 'owner' || club?.my_access_type === 'admin'
-  const isOwner = club?.my_access_type === 'owner'
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -100,10 +98,13 @@ export function ClubManagementPage() {
   if (loading) return <p className="page-state" role="status">{t('loading')}</p>
   if (error && !club) return <section className="club-management-page"><p className="club-list-error" role="alert">{error}</p><Link to="/my-clubs">{t('backToMyClubs')}</Link></section>
   if (!club) return null
+  const canManage = club.my_access_type === 'owner' || club.my_access_type === 'admin'
+  if (!canManage) return <Navigate to={`/clubs/${club.id}`} replace />
+  const isOwner = club.my_access_type === 'owner'
 
   return (
     <section className="club-management-page" aria-labelledby="club-management-title">
-      <Link className="club-management-back" to="/my-clubs">{t('backToMyClubs')}</Link>
+      <Link className="club-management-back" to={`/clubs/${club.id}`}>{t('backToClubDetails')}</Link>
       <header>
         <p>{t('clubManagement')}</p>
         <h1 id="club-management-title">{club.title}</h1>
@@ -111,8 +112,7 @@ export function ClubManagementPage() {
       </header>
       {notice && <p role="status">{notice}</p>}
       {error && <p className="club-form-error" role="alert">{error}</p>}
-      {canManage ? (
-        <form className="club-create-form" onSubmit={(event) => void save(event)}>
+      <form className="club-create-form" onSubmit={(event) => void save(event)}>
           <h2>{t('editClub')}</h2>
           <label className="club-form-field"><span>{t('clubType')}</span>
             <select value={clubType} onChange={(event) => setClubType(event.target.value as ClubRecord['club_type'])}>
@@ -124,7 +124,7 @@ export function ClubManagementPage() {
           <label className="club-form-field"><span>{t('clubAvatarUrl')}</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} /></label>
           <button className="button button-primary" type="submit" disabled={saving}>{saving ? t('saving') : t('saveClubChanges')}</button>
         </form>
-      ) : <p>{t('clubManagerOnly')}</p>}
+      {profile && accessToken && <ClubMemberManagement clubId={club.id} accessToken={accessToken} profileId={profile.id} isOwner={isOwner} />}
       {canManage && !club.is_public && accessToken && <InviteCodeManagement clubId={club.id} accessToken={accessToken} />}
       {isOwner && <div className="club-management-delete"><h2>{t('deleteClub')}</h2><button className="button button-light" type="button" disabled={deleting} onClick={() => void remove()}>{deleting ? t('loading') : t('deleteClub')}</button></div>}
     </section>

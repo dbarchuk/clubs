@@ -366,7 +366,7 @@ export function ClubListPage({ scope, searchQuery }: ClubListPageProps) {
                 </div>
               )}
               <div className="club-record-info">
-                <h2>{scope === 'my' ? <Link to={`/clubs/${club.id}/manage`}>{club.title}</Link> : club.title}</h2>
+                <h2>{scope === 'my' ? <Link to={`/clubs/${club.id}`}>{club.title}</Link> : club.title}</h2>
                 <span className="club-type-label">{clubTypeDetails[club.club_type].title}</span>
                 <span className="club-visibility">
                   {club.is_public ? <Globe2 size={13} aria-hidden="true" /> : <LockKeyhole size={13} aria-hidden="true" />}

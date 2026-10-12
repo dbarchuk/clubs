@@ -22,6 +22,8 @@ from app.backend.clubs.schemas import (
     ClubDeletionRequestResponse,
     ClubDeletionReview,
     ClubJoinResponse,
+    ClubMemberResponse,
+    ClubMemberRoleUpdate,
     ClubResponse,
     ClubUpdate,
     InviteCodeCreated,
@@ -268,6 +270,73 @@ async def join_public_club(
             raise
         return ClubJoinResponse(club_id=club.id, already_member=True)
     return ClubJoinResponse(club_id=club.id, already_member=False)
+
+
+@router.get("/{club_id}/members", response_model=list[ClubMemberResponse])
+async def list_club_members(
+    club_id: str,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+) -> list[ClubMemberResponse]:
+    require_club_manager(db, club_id, profile.id)
+    rows = db.execute(
+        select(ClubMember, Profile)
+        .join(Profile, Profile.id == ClubMember.user_id)
+        .where(ClubMember.club_id == club_id)
+        .order_by(ClubMember.access_type, Profile.display_name, Profile.id)
+    ).all()
+    return [
+        ClubMemberResponse(
+            user_id=member.user_id,
+            display_name=member_profile.display_name,
+            avatar_url=member_profile.avatar_url,
+            access_type=member.access_type,
+        )
+        for member, member_profile in rows
+    ]
+
+
+@router.patch(
+    "/{club_id}/members/{member_id}", response_model=ClubMemberResponse
+)
+async def update_club_member_role(
+    club_id: str,
+    member_id: str,
+    payload: ClubMemberRoleUpdate,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+) -> ClubMemberResponse:
+    require_club_manager(db, club_id, profile.id)
+    manager_access = get_member_access(db, club_id, profile.id)
+    member = db.get(ClubMember, (club_id, member_id))
+    if member is None:
+        raise HTTPException(status_code=404, detail="Club member not found")
+    if member.access_type == ClubMemberAccessType.OWNER:
+        raise HTTPException(status_code=409, detail="The club owner role cannot be changed")
+    if (
+        manager_access == ClubMemberAccessType.ADMIN
+        and member.access_type == ClubMemberAccessType.ADMIN
+        and payload.access_type != "admin"
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the club owner can remove or demote club admins",
+        )
+    if member_id == profile.id:
+        raise HTTPException(status_code=409, detail="You cannot change your own club role")
+
+    member.access_type = ClubMemberAccessType(payload.access_type)
+    db.commit()
+    db.refresh(member)
+    member_profile = db.get(Profile, member_id)
+    if member_profile is None:
+        raise HTTPException(status_code=404, detail="Club member not found")
+    return ClubMemberResponse(
+        user_id=member.user_id,
+        display_name=member_profile.display_name,
+        avatar_url=member_profile.avatar_url,
+        access_type=member.access_type,
+    )
 
 
 @router.get(

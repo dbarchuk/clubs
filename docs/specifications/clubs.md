@@ -11,7 +11,7 @@ Clubs let registered users organize around a shared interest. A club is either p
 
 - **Registered user:** Can create clubs, join public clubs, and join private clubs with a valid invite code.
 - **Club owner:** The registered user who created the club. The owner is a member of the club and can manage it.
-- **Club admin:** A club member with the club-level `admin` access type. The exact club-management permissions for this role need confirmation (see Open questions).
+- **Club admin:** A club member with the club-level `admin` access type. Owners assign and remove admins. Admins may assign other admins but cannot remove or demote them. Owners and admins can assign and remove moderators.
 - **Platform admin:** A user whose profile has `is_admin = true`. Platform admins can process public-club deletion requests.
 
 Every club has one owner. Creating a club also makes its owner a member with the owner access type.
@@ -115,6 +115,8 @@ The system needs a persisted request associated with the club and requesting own
 ## Current implementation
 
 The backend supports authenticated club creation and paginated listing. It now also supports direct public-club joining, private-club joining with an invite code, owner/admin invite management, owner deletion, and platform-admin review of public-club deletion requests. Clubs are soft-deleted and hidden from normal lists and join flows. The model uses club access types `owner`, `admin`, `moderator`, and `member`.
-# Club management
+# Club details and management
 
-Selecting a club title from the member club list opens that club's management page. Club editing, private-club invite-code management, and owner deletion controls are presented on that page rather than in the list card. Owners and club admins can edit club type, title, and avatar URL. Only the owner can delete a club.
+Selecting a club title from the member club list opens that club's details page. Members see club events there. Owners and admins have a **Club management** button that opens a separate management page. Owners and club admins can edit club type, title, and avatar URL. Only the owner can delete a club.
+
+The management page lists club members and their access types. The owner can assign or remove admins and moderators. Admins can assign admins and assign or remove moderators, but cannot remove or demote an admin. No user can change their own role, and the owner role cannot be reassigned.

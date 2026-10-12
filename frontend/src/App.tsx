@@ -4,6 +4,7 @@ import { ProfilePage } from './pages/ProfilePage'
 import { ClubListPage } from './pages/ClubListPage'
 import { ClubDeletionRequestsPage } from './pages/ClubDeletionRequestsPage'
 import { ClubManagementPage } from './pages/ClubManagementPage'
+import { ClubDetailsPage } from './pages/ClubDetailsPage'
 import mainIcon from './assets/main_icon.png'
 import { Users, Globe2, LogOut, Search, ShieldCheck } from 'lucide-react'
 import { Link, NavLink, Routes, Route } from 'react-router-dom'
@@ -113,6 +114,7 @@ function App() {
             <Route path="/my-clubs" element={<ClubListPage key="my-clubs" scope="my" searchQuery={searchQuery} />} />
             <Route path="/public-clubs" element={<ClubListPage key="public-clubs" scope="public" searchQuery={searchQuery} />} />
             <Route path="/clubs/:clubId/manage" element={<ClubManagementPage />} />
+            <Route path="/clubs/:clubId" element={<ClubDetailsPage />} />
             <Route path="/club-deletion-requests" element={<ClubDeletionRequestsPage />} />
             <Route path="/me" element={<ProfilePage />} />
             <Route path="*" element={<section className="welcome-page"><h1>404</h1></section>} />

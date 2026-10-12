@@ -86,6 +86,17 @@ class ClubJoinResponse(BaseModel):
     already_member: bool
 
 
+class ClubMemberResponse(BaseModel):
+    user_id: str
+    display_name: str
+    avatar_url: str | None
+    access_type: ClubMemberAccessType
+
+
+class ClubMemberRoleUpdate(BaseModel):
+    access_type: Literal["admin", "moderator", "member"]
+
+
 class InviteCodeCreated(BaseModel):
     id: str
     code: str

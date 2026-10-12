@@ -22,6 +22,31 @@ export interface ClubRecord {
   my_access_type: 'owner' | 'admin' | 'moderator' | 'member' | null
 }
 
+export interface ClubMemberRecord {
+  user_id: string
+  display_name: string
+  avatar_url: string | null
+  access_type: 'owner' | 'admin' | 'moderator' | 'member'
+}
+
+export interface EventRecord {
+  id: string
+  club_id: string
+  title: string | null
+  linked_item_id: string | null
+  avatar_url: string | null
+  start_date: string
+  end_date: string
+  start_time: string | null
+  end_time: string | null
+  status: 'scheduled' | 'delayed' | 'cancelled' | 'held' | 'deleted'
+  created_by: string
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+  deleted_by: string | null
+}
+
 export interface InviteCodeResponse {
   id: string
   code: string | null

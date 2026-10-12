@@ -4,3 +4,12 @@
 .club-management-page h1, .club-management-page h2 { margin: 0; }
 .club-management-back { width: fit-content; }
 .club-management-delete { display: grid; justify-items: start; gap: .75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.club-member-management { display: grid; gap: .75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.club-member-management h2 { margin: 0; }
+.club-member-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.club-member-list li { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; }
+.club-member-list img, .club-member-avatar { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }
+.club-member-avatar { display: grid; place-items: center; color: #648066; background: var(--bg, #e8eee4); }
+.club-member-name { flex: 1; }
+.club-member-list select { min-width: 132px; padding: 7px; border: 1px solid var(--border); border-radius: 7px; color: inherit; background: var(--surface, #fff); }
+.club-member-role { color: var(--muted); font-size: 12px; }

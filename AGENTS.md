@@ -64,7 +64,9 @@ if (error) return <ErrorState message={error} />
 
 ### Styling
 - CSS is imported directly (`import './clubs.css'`)
-- Use CSS custom properties (`--serif`, colors) defined in `theme.css` for consistency
+- Use CSS custom properties (`--serif`, `--surface`, `--border`, `--muted`) defined in `theme.css` for consistency
+- `theme.css` defines the light palette on `:root` and overrides theme tokens under `:root[data-theme='dark']`; use these tokens for panel backgrounds, borders, and secondary text instead of hardcoded light colors
+- When a component needs colors beyond shared tokens, add matching light and dark rules in `theme.css`. Check both the component surface and its heading, body, and muted text colors
 - No inline `style` props except for truly dynamic values (e.g., `width: ${progress}%`)
 - Utility classes only for layout; keep visual tokens in CSS
 

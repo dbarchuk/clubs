@@ -29,6 +29,14 @@ export type TranslationKey =
   | 'couldNotReviewDeletionRequest' | 'clubManagement' | 'editClub' | 'saveClubChanges'
   | 'clubUpdated' | 'couldNotLoadClub' | 'couldNotUpdateClub' | 'backToMyClubs' | 'clubManagerOnly'
   | 'copyInviteCode' | 'inviteCodeCopied' | 'inviteCodeCopyFailed' | 'inviteCodeNeedsReplacement'
+  | 'eventsEyebrow' | 'clubEvents' | 'createEvent' | 'eventTitle' | 'linkedItemId'
+  | 'eventAvatarUrl' | 'startDate' | 'endDate' | 'startTime' | 'endTime' | 'noEvents'
+  | 'clubEvent' | 'allDay' | 'eventStatus' | 'eventStatus_scheduled' | 'eventStatus_delayed'
+  | 'eventStatus_cancelled' | 'eventStatus_held' | 'eventStatus_deleted' | 'deleteEvent'
+  | 'confirmDeleteEvent' | 'eventCreated' | 'eventDeleted' | 'eventsLoadError'
+  | 'eventSaveError' | 'eventUpdateError' | 'eventDeleteError'
+  | 'clubDetails' | 'backToClubDetails' | 'clubMembers' | 'ownerRole' | 'moderatorRole'
+  | 'memberRoleLabel' | 'couldNotLoadMembers' | 'couldNotUpdateMemberRole'
 
 export interface I18nContextValue {
   language: Language
