@@ -4,7 +4,7 @@ export type Language = 'uk' | 'en'
 export type TranslationKey =
   | 'loading' | 'language' | 'workspace' | 'navigation' | 'myClubs' | 'publicClubs'
   | 'movieClubs' | 'bookClubs' | 'sportClubs' | 'boardGameClubs' | 'clubType'
-  | 'profile' | 'viewProfile' | 'storyEnthusiast' | 'signOut' | 'yourSpace' | 'clubs'
+  | 'profile' | 'viewProfile' | 'signOut' | 'yourSpace' | 'clubs'
   | 'welcomeBack' | 'yourClubs' | 'chooseCategory' | 'createAccount' | 'startTracking'
   | 'signInToManage' | 'yourName' | 'email' | 'password' | 'yourPassword'
   | 'authenticationFailed' | 'googleSignInFailed' | 'signIn' | 'createAccountAction' | 'or'

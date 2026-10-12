@@ -30,11 +30,12 @@
 .invite-card p { color: #84857b; font-size: 11px; line-height: 1.55; margin: 7px 0 12px; }
 .invite-link, .text-link { display: inline-flex; align-items: center; gap: 7px; color: #5f7a61; font-size: 11px; font-weight: 650; text-decoration: none; }
 .profile-row { display: flex; align-items: center; gap: 10px; padding: 19px 2px 0; }
-.profile-row > div:nth-child(2) { display: grid; gap: 2px; }
+.profile-row > div:nth-child(2) { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .profile-row strong { color: #45473f; font-size: 11px; }
 .profile-name-link { text-decoration: none; }
 .profile-name-link:hover strong { color: #4f6c53; text-decoration: underline; }
 .profile-row span { color: #9a9b92; font-size: 10px; }
+.profile-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { display: grid; place-items: center; color: #586d52; background: #dfe8d6; border-radius: 50%; font-family: var(--serif); font-weight: 700; }
 .avatar-small { width: 33px; height: 33px; font-size: 11px; }
 img.avatar { object-fit: cover; }

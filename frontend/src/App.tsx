@@ -70,7 +70,7 @@ function App() {
               <Link to="/me" className="profile-name-link" aria-label={t('viewProfile')}>
                 <strong>{displayName}</strong>
               </Link>
-              <span>{t('storyEnthusiast')}</span>
+              <span className="profile-email" title={user.email ?? undefined}>{user.email ?? t('notSet')}</span>
             </div>
             <button className="icon-button" onClick={signOut} aria-label={t('signOut')}><LogOut size={17} aria-hidden="true" /></button>
           </div>
