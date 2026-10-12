@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -17,7 +18,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.models import OwnedModelMixin, TimestampMixin, UlidMixin
+from app.core.models import OwnedModelMixin, UlidMixin
+
+if TYPE_CHECKING:
+    from app.backend.users.models import Profile
 
 
 class ClubType(str, Enum):
@@ -34,7 +38,7 @@ class ClubMemberAccessType(str, Enum):
     MEMBER = "member"
 
 
-class Club(UlidMixin, TimestampMixin, OwnedModelMixin, Base):
+class Club(UlidMixin, OwnedModelMixin, Base):
     __tablename__ = "clubs"
 
     club_type: Mapped[ClubType] = mapped_column(
@@ -104,9 +108,6 @@ class ClubInviteCode(UlidMixin, Base):
     code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_by: Mapped[str] = mapped_column(
         String(26), ForeignKey("profiles.id"), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     revoked_by: Mapped[str | None] = mapped_column(

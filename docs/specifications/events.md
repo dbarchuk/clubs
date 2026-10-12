@@ -33,6 +33,8 @@ Cancelled and held events remain available to club members as history. A delayed
 - Start and end times are optional. When omitted, the event is all-day. When provided, the event is timed.
 - For a timed event, both start and end times are provided; the end must not precede the start when the dates are the same.
 - Events spanning multiple days are supported. The club's time zone should be used to interpret/display event times; the time-zone source needs confirmation.
+- Movie club entries represent the watch queue or a planned watch. Their start date is optional, and they do not have an end date or time. An entry without a start date appears in the queue. If a movie club entry is created with a start date before the current date, it is created with `held` status.
+- Other club types continue to require start and end dates.
 - Delaying an event should not silently overwrite its original schedule. Whether the system keeps both original and revised scheduling details is an open question.
 
 ## Catalog item association
@@ -44,7 +46,7 @@ Cancelled and held events remain available to club members as history. A delayed
 - The event may have an optional `avatar_url`. When the associated item has an image, it can be used as the event avatar; for a book or movie this is its cover image. The UI uses a fallback when no avatar URL is available.
 - If no title is entered and no item is linked, the event is still valid and the UI can use a neutral label such as “Club event.”
 - Use a generic reference name such as `linked_item_id`, rather than embedding supported item kinds in the field name. The catalog item should carry its own kind/type so new kinds can be added without changing the event reference field. If items remain in separate tables, the association design must specify how the generic ID identifies its target.
-- The codebase currently has no catalog model, so the link target and selection flow depend on a future catalog. Until then, the association is optional and may be unavailable.
+- Movie clubs let an event link to a saved movie. Movie search checks the local catalog for exact-title matches before querying TMDB; selecting a TMDB result saves it first, then links the new integer movie ID. Other catalog item types may use the generic reference in future.
 
 ## Visibility
 
@@ -64,10 +66,10 @@ Cancelled and held events remain available to club members as history. A delayed
 | `title` | Optional user-provided title |
 | `linked_item_id` | Optional generic reference to an associated catalog item, if a catalog exists |
 | `avatar_url` | Optional image URL; may use the linked item's cover or image |
-| `start_date` | Required local calendar date |
-| `end_date` | Required local calendar date, on or after `start_date` |
-| `start_time` | Optional; null for all-day events |
-| `end_time` | Optional; must be supplied with `start_time` |
+| `start_date` | Required for non-movie events; optional for movie club queue entries |
+| `end_date` | Required for non-movie events, on or after `start_date`; null for movie club entries |
+| `start_time` | Optional for non-movie events; null for all-day events and movie club entries |
+| `end_time` | Optional for non-movie events; must be supplied with `start_time`; null for movie club entries |
 | `status` | `scheduled`, `delayed`, `cancelled`, `held`, or `deleted` |
 | `created_by` | Profile that created the event |
 | `created_at`, `updated_at` | Creation and last-update timestamps |
@@ -79,6 +81,8 @@ If delayed-event schedule history is required, store the prior and revised sched
 ## Required application capabilities
 
 - Create an event for a club.
+- Open the creation form from a Create event button. Show upcoming events, the movie queue where applicable, and held events in separate sections.
+- For movie clubs, allow creation with no start date to add an item to the queue; create entries with a past start date as held.
 - List and view events for a club, subject to club membership and visibility.
 - Represent all-day and timed events, including events spanning more than one date.
 - Optionally associate an event with a generic catalog item and derive its displayed title when no custom title was entered.
@@ -89,7 +93,7 @@ If delayed-event schedule history is required, store the prior and revised sched
 
 ## Acceptance criteria
 
-1. A valid event is associated with exactly one club and has a start date and end date with the end on or after the start.
+1. Every event belongs to exactly one club. Non-movie events require start and end dates with the end on or after the start; movie club entries have an optional start date and no end date.
 2. An event with no times is treated as all-day; a timed event has both a start and end time.
 3. A catalog item association is optional. When it exists and no custom title is set, the linked item's title is shown as the event title.
 4. An event with neither custom title nor linked item can still be created and shown with a neutral fallback label.
@@ -98,6 +102,7 @@ If delayed-event schedule history is required, store the prior and revised sched
 7. Cancelled and held events remain accessible in the club's event history.
 8. A deleted event has `status = deleted`, a deletion timestamp, and the profile that deleted it; normal event listings do not return it.
 9. The generic item reference can support additional catalog item kinds without renaming the event field. An associated item's image may be shown as the event avatar.
+10. Event creation begins from a button, and event lists are separated into upcoming, queue (movie clubs), and held sections. A movie club entry created with a past start date has `held` status.
 
 ## Open questions
 

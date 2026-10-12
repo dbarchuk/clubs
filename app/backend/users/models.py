@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import Optional
+from datetime import date
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, Date, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.database import Base
-from app.core.models import TimestampMixin, UlidMixin
+from app.core.models import UlidMixin
+
+if TYPE_CHECKING:
+    from app.backend.clubs.models import Club, ClubMember
 
 
-class Profile(UlidMixin, TimestampMixin, Base):
+class Profile(UlidMixin, Base):
     __tablename__ = "profiles"
 
     user_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)

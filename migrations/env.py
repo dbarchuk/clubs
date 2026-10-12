@@ -11,6 +11,7 @@ from app.core.database import Base
 from migrations.naming import next_revision_id
 from app.backend.clubs.models import * # noqa: F403, F401
 from app.backend.events.models import * # noqa: F403, F401
+from app.backend.movies.models import * # noqa: F403, F401
 from app.backend.users.models import * # noqa: F403, F401
 
 config = context.config

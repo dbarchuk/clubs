@@ -34,9 +34,10 @@ export interface EventRecord {
   club_id: string
   title: string | null
   linked_item_id: string | null
+  linked_movie: MovieRecord | null
   avatar_url: string | null
-  start_date: string
-  end_date: string
+  start_date: string | null
+  end_date: string | null
   start_time: string | null
   end_time: string | null
   status: 'scheduled' | 'delayed' | 'cancelled' | 'held' | 'deleted'
@@ -45,6 +46,28 @@ export interface EventRecord {
   updated_at: string
   deleted_at: string | null
   deleted_by: string | null
+}
+
+export interface MovieSearchResult {
+  id: number | null
+  provider: string
+  external_id: string
+  title: string
+  original_title: string
+  overview: string
+  release_date: string | null
+  cover_image_url: string | null
+  backdrop_image_url: string | null
+  original_language: string | null
+  popularity: number | null
+  vote_average: number | null
+}
+
+export interface MovieRecord extends MovieSearchResult {
+  id: number
+  created_by: string
+  created_at: string
+  updated_at: string
 }
 
 export interface InviteCodeResponse {

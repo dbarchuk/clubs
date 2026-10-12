@@ -59,7 +59,7 @@ export function ClubDetailsPage() {
         </div>
         {canManage && <Link className="button button-primary" to={`/clubs/${club.id}/manage`}>{t('clubManagement')}</Link>}
       </header>
-      <EventManagement clubId={club.id} accessToken={accessToken} canManage={canManage} />
+      <EventManagement clubId={club.id} clubType={club.club_type} accessToken={accessToken} canManage={canManage} />
     </section>
   )
 }

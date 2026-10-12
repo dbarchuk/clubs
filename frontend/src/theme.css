@@ -78,6 +78,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid #789276; outline-offs
 :root[data-theme='dark'] .club-search input,
 :root[data-theme='dark'] .club-form-field input,
 :root[data-theme='dark'] .club-form-field select { color: #e4e8df; background: #171c18; border-color: #424b42; }
+:root[data-theme='dark'] .movie-search-results button { color: #e4e8df; background: #202520; border-color: #424b42; }
+:root[data-theme='dark'] .movie-search-results button:hover { border-color: #829781; }
+:root[data-theme='dark'] .movie-event-card { border-color: #353d35; background: #202520; }
+:root[data-theme='dark'] .movie-event-card-trigger > img,
+:root[data-theme='dark'] .movie-event-card-placeholder { background: linear-gradient(145deg, #384737, #242d24); }
+:root[data-theme='dark'] .movie-event-card-editor select { color: #e4e8df; background: #171c18; border-color: #424b42; }
 :root[data-theme='dark'] .club-visibility,
 :root[data-theme='dark'] .club-type-label,
 :root[data-theme='dark'] .club-public-toggle small,

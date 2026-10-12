@@ -119,10 +119,11 @@ if (error) return <ErrorState message={error} />
 ```
 app/
 ├── core/           # config, database, logging, middleware
-├── backend/        # feature routers (clubs, users, events)
+├── backend/        # feature routers (clubs, users, events, movies)
 │   ├── clubs/
 │   ├── users/
-│   └── events/
+│   ├── events/
+│   └── movies/
 └── main.py         # app factory, lifespan, router registration
 migrations/         # Alembic migrations
 ```
@@ -130,6 +131,7 @@ migrations/         # Alembic migrations
 ### Database Layer
 - Use `SQLAlchemy 2.0` style with `DeclarativeBase` from `app.core.database`
 - All models inherit from `Base` — never create standalone declarative bases
+- `Base` supplies `created_at` and `updated_at` to every mapped model; do not redeclare or separately mix in timestamp columns
 - Use `Session` dependency injection via `get_db()` — never create sessions outside the dependency chain
 - Always use **async** functions with `await` for database operations
 - Use `AsyncSession` for async database access
@@ -193,6 +195,7 @@ async def list_clubs(db: Session = Depends(get_db)) -> list[Club]:
 - All settings via `pydantic-settings` in `app/core/config.py`
 - Use `.env` file for environment variables (never hardcode secrets)
 - Settings are cached with `@lru_cache` — no repeated instantiation
+- Application modules should import and use the shared `settings` instance from `app.core.config`; use `get_settings()` only when a separate settings instance is specifically needed
 - Use `SecretStr` for passwords
 
 ---

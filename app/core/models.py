@@ -1,6 +1,5 @@
 import secrets
 import time
-from datetime import UTC, datetime
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -23,16 +22,6 @@ def generate_ulid() -> str:
 
 class UlidMixin:
     id: Mapped[str] = mapped_column(String(26), primary_key=True, default=generate_ulid)
-
-
-class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC).replace(tzinfo=None)
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        default=lambda: datetime.now(UTC).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
-    )
 
 
 class OwnedModelMixin:

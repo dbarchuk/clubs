@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     supabase_publishable_key: SecretStr | None = None
     supabase_secret_key: SecretStr | None = None
     supabase_jwks_url: str | None = None
+    tmdb_api_key: SecretStr | None = None
     log_level: Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"] = "INFO"
     debug: bool = False
     port: int = Field(default=8000, ge=1, le=65535)

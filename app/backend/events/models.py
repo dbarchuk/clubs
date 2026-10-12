@@ -7,7 +7,7 @@ from sqlalchemy import Date, DateTime, Enum as SqlEnum, ForeignKey, Index, Strin
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
-from app.core.models import TimestampMixin, UlidMixin
+from app.core.models import UlidMixin
 
 
 class EventStatus(str, Enum):
@@ -18,7 +18,7 @@ class EventStatus(str, Enum):
     DELETED = "deleted"
 
 
-class Event(UlidMixin, TimestampMixin, Base):
+class Event(UlidMixin, Base):
     __tablename__ = "events"
     __table_args__ = (Index("ix_events_club_start", "club_id", "start_date"),)
 
@@ -28,8 +28,8 @@ class Event(UlidMixin, TimestampMixin, Base):
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     linked_item_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     status: Mapped[EventStatus] = mapped_column(
