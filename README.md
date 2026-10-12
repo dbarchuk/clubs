@@ -53,15 +53,15 @@ uv run pre-commit run --all-files
 
 ## Deploy on a Google Cloud VM
 
-The production service uses systemd and Uvicorn directly; Docker is not required. The checked-in service file is configured for your Ubuntu VM login `dvbarchuk` and checkout path `/home/dvbarchuk/opt/clubs`; adjust those values if your VM username or checkout path differs. PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
+The production service uses systemd and Uvicorn directly; Docker is not required. The systemd template uses the service instance name as its Linux user and expects the checkout at `/home/<user>/opt/clubs`. Set `CLUBS_USER` to the VM login when enabling the service. `EnvironmentFile` values cannot configure systemd's `User=`, `Group=`, or `WorkingDirectory=` directives, so the account is selected through the template instance. PostgreSQL is hosted by Supabase. Uvicorn listens on `127.0.0.1:8000` with two workers and reload disabled. Put Nginx, Caddy, or a Google Cloud HTTPS load balancer in front of it for public HTTPS traffic; do not expose port 8000 in the VM firewall.
 
-Install Node.js and [uv](https://docs.astral.sh/uv/) on the VM. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
+Install Node.js with npm and [uv](https://docs.astral.sh/uv/) on the VM. Install the existing `uv` binary system-wide so systemd can run it. Use uv to install Python 3.13. The checkout should be owned by your VM login:
 
 ```sh
 sudo install -m 0755 "$(command -v uv)" /usr/local/bin/uv
 ```
 
-Install production dependencies and build the frontend with the production Supabase public settings:
+Install production backend dependencies and frontend dependencies, then configure the frontend's build-time Supabase settings:
 
 ```sh
 cd ~/opt/clubs
@@ -69,9 +69,11 @@ uv python install 3.13
 uv sync --no-dev
 cd frontend
 npm ci
-VITE_SUPABASE_URL=https://your-project.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key npm run build
+cp .env.example .env
+# Edit .env with the production VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY
+chmod 600 .env
 cd ..
-test -f frontend/dist/index.html
+mkdir -p frontend/dist frontend/node_modules/.tmp
 ```
 
 Create the project-root `.env` from [.env.example](.env.example) and fill in production values. The app and Alembic load this file from the project root. Keep it private and make sure the systemd service user can read it:
@@ -81,25 +83,28 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-The project `.env` must be owned by `dvbarchuk` so the service can read it.
+The project `.env` must be owned by `$CLUBS_USER` so the service can read it.
 
-Install and start the systemd unit:
+Set the Linux account, install the systemd template, and enable its instance. The checkout should be at `/home/$CLUBS_USER/opt/clubs` and owned by that account:
 
 ```sh
-sudo install -m 0644 deploy/clubs.service /etc/systemd/system/clubs.service
+CLUBS_USER=dvbarchuk
+sudo install -m 0644 deploy/clubs@.service /etc/systemd/system/clubs@.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now clubs
-sudo systemctl status clubs
+sudo systemctl enable --now "clubs@${CLUBS_USER}.service"
+sudo systemctl status "clubs@${CLUBS_USER}.service"
 ```
+
+For an existing installation of the fixed-name `clubs.service`, stop and disable that unit before enabling the template instance: `sudo systemctl disable --now clubs.service`.
 
 If systemd has rate-limited retries after a failed start, clear that state before restarting:
 
 ```sh
-sudo systemctl reset-failed clubs
-sudo systemctl restart clubs
+sudo systemctl reset-failed "clubs@${CLUBS_USER}.service"
+sudo systemctl restart "clubs@${CLUBS_USER}.service"
 ```
 
-The unit runs `uv run ... alembic upgrade head` before starting the app and uses `uv run` for Uvicorn as well. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` when deploying code. After deploying code, rebuild the frontend if needed and restart with `sudo systemctl restart clubs`. View service logs with `sudo journalctl -u clubs -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
+On every service start, systemd runs the Alembic migrations and rebuilds the frontend with `npm run build` before starting Uvicorn. The build reads `frontend/.env`, so keep the production Supabase URL and publishable key there; these are public values embedded in the browser app. The unit is allowed to write only to the frontend build output and TypeScript's temporary build cache. It stores uv's cache in systemd's writable `/var/cache/clubs/uv` directory. Runtime commands use `--no-sync`, so install dependencies with `uv sync --no-dev` and `cd frontend && npm ci && mkdir -p dist node_modules/.tmp` when deploying code. Restart the service after deploying to apply the backend and frontend changes: `sudo systemctl restart "clubs@${CLUBS_USER}.service"`. View service logs with `sudo journalctl -u "clubs@${CLUBS_USER}.service" -f`. Set the VM's Google Cloud firewall to allow SSH and HTTPS to the chosen reverse proxy; keep the app's port 8000 private to the VM.
 
 Migration revisions are numbered sequentially and use Alembic's lowercase underscore slug, for example `00001_initial_migration.py`.
 

@@ -1,0 +1,29 @@
+[Unit]
+Description=Clubs FastAPI application (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+Group=%i
+WorkingDirectory=/home/%i/opt/clubs
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=UV_CACHE_DIR=/var/cache/clubs/uv
+CacheDirectory=clubs
+ExecStartPre=/usr/local/bin/uv run --project /home/%i/opt/clubs --no-sync alembic upgrade head
+ExecStartPre=npm --prefix /home/%i/opt/clubs/frontend run build
+ExecStart=/usr/local/bin/uv run --project /home/%i/opt/clubs --no-sync uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/%i/opt/clubs/frontend/dist /home/%i/opt/clubs/frontend/node_modules/.tmp
+
+[Install]
+WantedBy=multi-user.target
