@@ -215,9 +215,12 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     ? events.filter((record) => record.status !== 'held' && record.start_date === null)
     : []
   const heldEvents = events.filter((record) => record.status === 'held')
-  const upcomingEvents = events.filter((record) =>
-    record.status !== 'held' && !(clubType === 'movie' && record.start_date === null),
-  )
+  const upcomingEvents = events
+    .filter((record) =>
+      record.status !== 'held' && record.status !== 'cancelled'
+      && !(clubType === 'movie' && record.start_date === null),
+    )
+    .sort((first, second) => (second.start_date ?? '').localeCompare(first.start_date ?? ''))
 
   const renderEvent = (record: EventRecord) => (
     clubType === 'movie' ? renderMovieEvent(record) : (

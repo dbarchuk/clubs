@@ -3,6 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.backend.board_games.router import router as board_games_router
 from app.backend.clubs.router import router as clubs_router
 from app.backend.events.router import router as events_router
 from app.backend.movies.router import router as movies_router
@@ -15,6 +16,7 @@ router.include_router(clubs_router)
 router.include_router(users_router)
 router.include_router(events_router)
 router.include_router(movies_router)
+router.include_router(board_games_router)
 
 
 @router.get("/health", tags=["health"])
