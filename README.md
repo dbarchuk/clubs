@@ -88,7 +88,7 @@ The project `.env` must be owned by `$CLUBS_USER` so the service can read it.
 Set the Linux account, install the systemd template, and enable its instance. The checkout should be at `/home/$CLUBS_USER/opt/clubs` and owned by that account:
 
 ```sh
-CLUBS_USER=dvbarchuk
+CLUBS_USER=<your-user>
 sudo install -m 0644 deploy/clubs@.service /etc/systemd/system/clubs@.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now "clubs@${CLUBS_USER}.service"
