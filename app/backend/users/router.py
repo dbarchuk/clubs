@@ -146,10 +146,12 @@ async def get_me(profile: Profile = Depends(get_current_profile)) -> Profile:
 
 @router.get("", response_model=list[dict[str, object]])
 async def list_users(
-    _user: SupabaseUser = Depends(get_current_user),
+    profile: Profile = Depends(get_current_profile),
 ) -> list[dict[str, object]]:
+    if not profile.is_admin:
+        raise HTTPException(status_code=403, detail="Administrator access is required")
     if not settings.database_url or not settings.supabase_secret_key:
-        raise HTTPException(status_code=503, detail=f"Supabase user listing is not configured {settings.database_url}/{settings.supabase_secret_key}")
+        raise HTTPException(status_code=503, detail="Supabase user listing is not configured")
 
     users: list[dict[str, object]] = []
     page = 1

@@ -26,6 +26,8 @@ To enable Google sign-in, configure Google as a provider in **Supabase Dashboard
 
 In Google Auth Platform, open **Data Access** and make sure `openid`, `.../auth/userinfo.email`, and `.../auth/userinfo.profile` are configured. Add `openid` manually if it is missing; the email and profile scopes are normally present by default. The frontend requests `openid email profile` during sign-in.
 
+For production, deploy the app on a domain you own and verify that domain in Google Search Console. The public homepage describes clubworms and links to the policies. In **Google Auth Platform → Branding → App domain**, use `https://<your-domain>/` as the homepage, `https://<your-domain>/privacy-policy.html` as the privacy policy, and `https://<your-domain>/terms-of-service.html` as the terms of service. Use the same policy URLs on the homepage and OAuth branding form. Google requires these links for external production apps and requires the privacy policy to be accessible on the app's domain. See [Google's app branding requirements](https://support.google.com/cloud/answer/15549049) and [OAuth brand verification guidance](https://developers.google.com/identity/protocols/oauth2/production-readiness/brand-verification).
+
 For local Supabase CLI development, set `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET` in the project-root `.env` and replace the placeholder `client_id` in [supabase/config.toml](supabase/config.toml). The secret is intentionally kept out of frontend environment variables. This local configuration does not update a hosted Supabase project's Auth settings; configure the Google provider in that project's dashboard as well.
 
 The shared SQLAlchemy engine, declarative model base, session factory, and FastAPI `get_db` dependency are in `app/core/database.py`. Add ORM models under their backend domain and import them into the Alembic environment before generating migrations.
@@ -130,7 +132,7 @@ You can also run the API and frontend separately with `make dev-backend` and `ma
 
 Interactive API documentation is at `http://127.0.0.1:8000/docs` by default; it follows the configured `PORT` if changed.
 
-`GET /api/users` returns all Supabase Auth user records, including their user and app metadata. It requires a valid signed-in user token and the server-only `SUPABASE_SECRET_KEY`; access is available to any signed-in user. Results are fetched across all Supabase pages.
+`GET /api/users` returns all Supabase Auth user records, including their user and app metadata. It requires an administrator profile and the server-only `SUPABASE_SECRET_KEY`; results are fetched across all Supabase pages.
 
 ## Build and serve together
 

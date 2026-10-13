@@ -5,9 +5,10 @@ import { ClubListPage } from './pages/ClubListPage'
 import { ClubDeletionRequestsPage } from './pages/ClubDeletionRequestsPage'
 import { ClubManagementPage } from './pages/ClubManagementPage'
 import { ClubDetailsPage } from './pages/ClubDetailsPage'
+import { PublicHomePage } from './pages/PublicHomePage'
 import mainIcon from './assets/main_icon.png'
 import { Users, Globe2, LogOut, Search, ShieldCheck } from 'lucide-react'
-import { Link, NavLink, Routes, Route } from 'react-router-dom'
+import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom'
 import { useState, type FormEvent } from 'react'
 import { useI18n } from './lib/i18n-context'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
@@ -18,6 +19,7 @@ import './clubs.css'
 function App() {
   const { user, profile, loading, signOut } = useAuth()
   const { t } = useI18n()
+  const location = useLocation()
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -26,7 +28,7 @@ function App() {
   }
 
   if (!user) {
-    return <LoginPage />
+    return location.pathname === '/' ? <PublicHomePage /> : <LoginPage />
   }
 
   const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? t('member')
@@ -100,6 +102,7 @@ function App() {
 
         <div className="page-wrap">
           <Routes>
+            <Route path="/login" element={<Navigate to="/my-clubs" replace />} />
             <Route
               path="/"
               element={(

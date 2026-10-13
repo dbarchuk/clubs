@@ -132,6 +132,9 @@
   color: #3e6243;
 }
 
+.login-legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; font-size: 11px; }
+.login-legal-links a { color: #777b72; }
+
 .login-divider {
   display: flex;
   align-items: center;

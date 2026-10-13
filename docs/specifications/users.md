@@ -54,7 +54,7 @@ The response is the updated profile. The API does not accept changes to `user_id
 
 ### `GET /api/users`
 
-Returns Supabase Auth user records, including user and app metadata, by paging through the Supabase admin users endpoint. It requires a valid signed-in user's token and the server-side `SUPABASE_SECRET_KEY`. The current implementation does not check `is_admin` before returning this list. Missing configuration returns HTTP 503; an invalid upstream response or failed request returns HTTP 502.
+Returns Supabase Auth user records, including user and app metadata, by paging through the Supabase admin users endpoint. It requires a valid profile with `is_admin = true` and the server-side `SUPABASE_SECRET_KEY`. Other authenticated users receive HTTP 403. Missing configuration returns HTTP 503; an invalid upstream response or failed request returns HTTP 502.
 
 ## User interface
 
@@ -68,10 +68,9 @@ Returns Supabase Auth user records, including user and app metadata, by paging t
 
 These are implementation facts with product or security implications; the code does not establish the intended policy.
 
-1. Should `GET /api/users` be restricted to users where `is_admin` is true? It currently allows any authenticated user and returns Auth metadata for all users.
-2. Should profile field limits and validation be enforced by the API as well as the UI? The current update route accepts unvalidated JSON apart from parsing `date_of_birth`.
-3. Should email changes, account deletion, password recovery, email verification, or account suspension be in scope for the users feature? No corresponding application flows are defined here.
-4. Is `is_admin` solely an administrative flag, and who is allowed to grant or revoke it? The current profile update API does not change it.
+1. Should profile field limits and validation be enforced by the API as well as the UI? The current update route accepts unvalidated JSON apart from parsing `date_of_birth`.
+2. Should email changes, account deletion, password recovery, email verification, or account suspension be in scope for the users feature? No corresponding application flows are defined here.
+3. Is `is_admin` solely an administrative flag, and who is allowed to grant or revoke it? The current profile update API does not change it.
 
 ## Acceptance criteria represented by the current implementation
 

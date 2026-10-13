@@ -13,6 +13,7 @@ export type TranslationKey =
   | 'saving' | 'cancel' | 'notSet' | 'role' | 'adminRole' | 'memberRole' | 'editProfile'
   | 'profileUnavailable' | 'backToMenu' | 'sessionExpired' | 'failedToLoadProfile'
   | 'failedToSaveProfile'
+  | 'privacyPolicy' | 'termsOfService' | 'legalInformation'
   | 'theme' | 'switchToLight' | 'switchToDark' | 'ukrainian' | 'english'
   | 'homeTitle' | 'homeIntroOne' | 'homeIntroTwo' | 'homeIntroThree'
   | 'searchClubs' | 'search' | 'createClub' | 'clubTitle' | 'clubAvatarUrl'

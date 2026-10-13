@@ -124,6 +124,10 @@ export function LoginPage() {
           <button className="text-link" onClick={() => setIsSignUp(!isSignUp)}>
             {isSignUp ? t('alreadyHaveAccount') : t('noAccount')}
           </button>
+          <nav className="login-legal-links" aria-label={t('legalInformation')}>
+            <a href="/privacy-policy.html">{t('privacyPolicy')}</a>
+            <a href="/terms-of-service.html">{t('termsOfService')}</a>
+          </nav>
         </div>
       </div>
     </div>
