@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
-import type { EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
+import type { BoardGameRecord, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
 import './events.css'
 
 interface EventManagementProps {
@@ -42,6 +42,11 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
   const [movieResults, setMovieResults] = useState<MovieSearchResult[]>([])
   const [hasSearchedMovies, setHasSearchedMovies] = useState(false)
   const [selectedMovie, setSelectedMovie] = useState<MovieRecord | MovieSearchResult | null>(null)
+  const [boardGameQuery, setBoardGameQuery] = useState('')
+  const [boardGameResults, setBoardGameResults] = useState<BoardGameRecord[]>([])
+  const [searchingBoardGames, setSearchingBoardGames] = useState(false)
+  const [savingBoardGame, setSavingBoardGame] = useState(false)
+  const [selectedBoardGame, setSelectedBoardGame] = useState<BoardGameRecord | null>(null)
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null)
 
   const loadEvents = useCallback(async () => {
@@ -73,6 +78,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setMovieResults([])
     setHasSearchedMovies(false)
     setSelectedMovie(null)
+    setBoardGameQuery('')
+    setBoardGameResults([])
+    setSelectedBoardGame(null)
   }
 
   const searchMovies = async () => {
@@ -103,10 +111,60 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     }
   }
 
+  const searchBoardGames = async () => {
+    const query = boardGameQuery.trim()
+    if (!query) return
+    setSearchingBoardGames(true)
+    setError('')
+    setBoardGameResults([])
+    try {
+      const response = await fetch(`/api/board-games?title=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSearchError')))
+      setBoardGameResults((await response.json()) as BoardGameRecord[])
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : t('boardGameSearchError'))
+    } finally {
+      setSearchingBoardGames(false)
+    }
+  }
+
+  const handleBoardGameSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void searchBoardGames()
+    }
+  }
+
+  const createBoardGame = async () => {
+    const gameTitle = boardGameQuery.trim()
+    if (!gameTitle) return
+    setSavingBoardGame(true)
+    setError('')
+    try {
+      const response = await fetch('/api/board-games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ title: gameTitle }),
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSaveError')))
+      const game = (await response.json()) as BoardGameRecord
+      setSelectedBoardGame(game)
+      setBoardGameQuery(game.title)
+      setBoardGameResults([])
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('boardGameSaveError'))
+    } finally {
+      setSavingBoardGame(false)
+    }
+  }
+
   const selectMovie = async (movie: MovieSearchResult) => {
     setError('')
     if (movie.id !== null) {
       setSelectedMovie(movie)
+      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : movie.title)
       setMovieResults([])
       setHasSearchedMovies(false)
       return
@@ -120,7 +178,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
         body: JSON.stringify({ external_id: movie.external_id }),
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('movieSaveError')))
-      setSelectedMovie((await response.json()) as MovieRecord)
+      const savedMovie = (await response.json()) as MovieRecord
+      setSelectedMovie(savedMovie)
+      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : savedMovie.title)
       setMovieResults([])
       setHasSearchedMovies(false)
     } catch (saveError) {
@@ -142,6 +202,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setEndTime(record.end_time?.slice(0, 5) ?? '')
     setSelectedMovie(record.linked_movie)
     setMovieQuery(record.linked_movie?.title ?? '')
+    setSelectedBoardGame(record.linked_board_game)
+    setBoardGameQuery(record.linked_board_game?.title ?? '')
+    setBoardGameResults([])
     setMovieResults([])
     setHasSearchedMovies(false)
     setError('')
@@ -154,6 +217,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setError('')
     setNotice('')
     const isMovieClub = clubType === 'movie'
+    const isBoardGameClub = clubType === 'board_games'
+    const isCatalogEvent = isMovieClub || isBoardGameClub
     const url = editingEvent
       ? `/api/events/${editingEvent.id}`
       : `/api/events/clubs/${clubId}`
@@ -162,13 +227,13 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
         method: editingEvent ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
-          title: title.trim() || null,
-          linked_item_id: isMovieClub ? (selectedMovie ? String(selectedMovie.id) : null) : (linkedItemId.trim() || null),
-          avatar_url: isMovieClub ? (selectedMovie?.cover_image_url ?? null) : (avatarUrl.trim() || null),
+          title: isBoardGameClub ? (selectedBoardGame?.title ?? null) : title.trim() || (isMovieClub ? selectedMovie?.title : null) || null,
+          linked_item_id: isMovieClub ? (selectedMovie ? String(selectedMovie.id) : null) : isBoardGameClub ? (selectedBoardGame ? String(selectedBoardGame.id) : null) : (linkedItemId.trim() || null),
+          avatar_url: isCatalogEvent ? null : (avatarUrl.trim() || null),
           start_date: startDate || null,
-          end_date: clubType === 'movie' ? null : endDate || null,
-          start_time: startTime || null,
-          end_time: endTime || null,
+          end_date: isCatalogEvent ? null : endDate || null,
+          start_time: isCatalogEvent ? null : startTime || null,
+          end_time: isCatalogEvent ? null : endTime || null,
         }),
       })
       if (!response.ok) throw new Error(await errorMessage(response, editingEvent ? t('eventUpdateError') : t('eventSaveError')))
@@ -223,11 +288,11 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     .sort((first, second) => (second.start_date ?? '').localeCompare(first.start_date ?? ''))
 
   const renderEvent = (record: EventRecord) => (
-    clubType === 'movie' ? renderMovieEvent(record) : (
+    clubType === 'movie' || clubType === 'board_games' ? renderCatalogEvent(record) : (
     <li className="event-card" key={record.id}>
-      {(record.avatar_url || record.linked_movie?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || ''} alt="" />}
+      {(record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || ''} alt="" />}
       <div className="event-card-content">
-        <h3>{record.title || record.linked_movie?.title || t('clubEvent')}</h3>
+        <h3>{record.title || record.linked_movie?.title || record.linked_board_game?.title || t('clubEvent')}</h3>
         <p>{record.start_date ? `${record.start_date}${record.end_date && record.end_date !== record.start_date ? ` – ${record.end_date}` : ''}${record.start_time ? ` · ${record.start_time.slice(0, 5)}–${record.end_time?.slice(0, 5) ?? ''}` : ` · ${t('allDay')}`}` : t('eventQueue')}</p>
         <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
       </div>
@@ -242,15 +307,17 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     )
   )
 
-  function renderMovieEvent(record: EventRecord) {
+  function renderCatalogEvent(record: EventRecord) {
+    const linkedTitle = record.linked_movie?.title || record.linked_board_game?.title
+    const linkedCover = record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url
     const cardContent = (
       <>
-        {record.avatar_url || record.linked_movie?.cover_image_url
-          ? <img src={record.avatar_url || record.linked_movie?.cover_image_url || ''} alt="" />
+        {record.avatar_url || linkedCover
+          ? <img src={record.avatar_url || linkedCover || ''} alt="" />
           : <span className="movie-event-card-placeholder" aria-hidden="true" />}
         <span className="movie-event-card-content">
           <span className="movie-event-card-date">{record.start_date ?? t('eventQueue')}</span>
-          <strong>{record.title || record.linked_movie?.title || t('clubEvent')}</strong>
+          <strong>{record.title || linkedTitle || t('clubEvent')}</strong>
           <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
         </span>
       </>
@@ -263,7 +330,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
             className="movie-event-card-trigger"
             type="button"
             aria-expanded={activeMovieStatusEditor === record.id}
-            aria-label={`${record.title || record.linked_movie?.title || t('clubEvent')} · ${t('eventStatus')}`}
+            aria-label={`${record.title || linkedTitle || t('clubEvent')} · ${t('eventStatus')}`}
             onClick={() => setActiveMovieStatusEditor((activeId) => activeId === record.id ? null : record.id)}
           >
             {cardContent}
@@ -290,7 +357,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     )
   }
 
-  const eventListClassName = clubType === 'movie' ? 'event-list movie-event-list' : 'event-list'
+  const eventListClassName = clubType === 'movie' || clubType === 'board_games' ? 'event-list movie-event-list' : 'event-list'
 
   return (
     <section className="event-management" aria-labelledby="club-events-title">
@@ -328,20 +395,48 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
               )}
               {!searchingMovies && hasSearchedMovies && movieResults.length === 0 && <p>{t('noMovieResults')}</p>}
             </div>
+          ) : clubType === 'board_games' ? (
+            <div className="movie-picker">
+              <label className="club-form-field"><span>{t('searchBoardGames')}</span><input value={boardGameQuery} onChange={(event) => { setBoardGameQuery(event.target.value); setSelectedBoardGame(null); setBoardGameResults([]) }} onKeyDown={handleBoardGameSearchKeyDown} /></label>
+              <div className="event-form-actions">
+                <button className="button button-light" type="button" onClick={() => void searchBoardGames()} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('search')}</button>
+                <button className="button button-light" type="button" onClick={() => void createBoardGame()} disabled={savingBoardGame || !boardGameQuery.trim()}>{savingBoardGame ? t('saving') : t('createBoardGame')}</button>
+              </div>
+              {selectedBoardGame && (
+                <div className="selected-movie">
+                  {selectedBoardGame.cover_image_url && <img src={selectedBoardGame.cover_image_url} alt="" />}
+                  <span>{selectedBoardGame.title}</span>
+                  <button className="button button-light" type="button" onClick={() => { setSelectedBoardGame(null); setBoardGameQuery('') }}>{t('removeSelectedBoardGame')}</button>
+                </div>
+              )}
+              {savingBoardGame && <p role="status">{t('savingBoardGame')}</p>}
+              {boardGameResults.length > 0 && (
+                <ul className="movie-search-results" aria-label={t('boardGameSearchResults')}>
+                  {boardGameResults.map((game) => (
+                    <li key={game.id}>
+                      <button type="button" onClick={() => { setSelectedBoardGame(game); setBoardGameQuery(game.title); setBoardGameResults([]) }}>
+                        {game.cover_image_url && <img src={game.cover_image_url} alt="" />}
+                        <span><strong>{game.title}</strong><small>{t('boardGameAlreadySaved')}</small></span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           ) : (
             <label className="club-form-field"><span>{t('linkedItemId')}</span><input value={linkedItemId} onChange={(event) => setLinkedItemId(event.target.value)} /></label>
           )}
-          {clubType !== 'movie' && <label className="club-form-field"><span>{t('eventAvatarUrl')}</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} /></label>}
+          {clubType !== 'movie' && clubType !== 'board_games' && <label className="club-form-field"><span>{t('eventAvatarUrl')}</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} /></label>}
           <div className="event-date-fields">
-            <label className="club-form-field"><span>{t('startDate')}{clubType === 'movie' ? ` (${t('optional')})` : ''}</span><input required={clubType !== 'movie'} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
-            {clubType !== 'movie' && <>
+            <label className="club-form-field"><span>{t('startDate')}{clubType === 'movie' || clubType === 'board_games' ? ` (${t('optional')})` : ''}</span><input required={clubType !== 'movie' && clubType !== 'board_games'} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+            {clubType !== 'movie' && clubType !== 'board_games' && <>
               <label className="club-form-field"><span>{t('endDate')}</span><input required type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
               <label className="club-form-field"><span>{t('startTime')}</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
               <label className="club-form-field"><span>{t('endTime')}</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
             </>}
           </div>
           <div className="event-form-actions">
-            <button className="button button-primary" type="submit" disabled={saving || savingMovie}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
+            <button className="button button-primary" type="submit" disabled={saving || savingMovie || savingBoardGame}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
             {editingEvent && <button className="button button-light" type="button" onClick={resetForm}>{t('cancelEditEvent')}</button>}
           </div>
         </form>

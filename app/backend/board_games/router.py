@@ -5,26 +5,13 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.backend.board_games.models import BoardGame, BoardGameType
-from app.backend.board_games.schemas import (
-    BoardGameCreate,
-    BoardGameResponse,
-    BoardGameTypeResponse,
-)
+from app.backend.board_games.models import BoardGame
+from app.backend.board_games.schemas import BoardGameCreate, BoardGameResponse
 from app.backend.users.models import Profile
 from app.backend.users.router import get_current_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/board-games", tags=["board-games"])
-
-
-@router.get("/types", response_model=list[BoardGameTypeResponse])
-async def list_board_game_types(
-    _: Annotated[Profile, Depends(get_current_profile)],
-    db: Annotated[Session, Depends(get_db)],
-) -> list[BoardGameTypeResponse]:
-    game_types = db.scalars(select(BoardGameType).order_by(BoardGameType.name)).all()
-    return [BoardGameTypeResponse.model_validate(game_type) for game_type in game_types]
 
 
 @router.get("", response_model=list[BoardGameResponse])
@@ -51,20 +38,10 @@ async def create_board_game(
     profile: Annotated[Profile, Depends(get_current_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> BoardGameResponse:
-    game_types = (
-        db.scalars(
-            select(BoardGameType).where(
-                BoardGameType.id.in_(payload.game_type_ids)
-            )
-        ).all()
-        if payload.game_type_ids
-        else []
-    )
-    values = payload.model_dump(exclude={"cover_image_url", "game_type_ids"})
+    values = payload.model_dump(exclude={"cover_image_url"})
     game = BoardGame(
         **values,
         cover_image_url=(str(payload.cover_image_url) if payload.cover_image_url else None),
-        game_types=list(game_types),
         created_by=profile.id,
     )
     db.add(game)

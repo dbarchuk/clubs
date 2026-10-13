@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, Date, String, Text
+from sqlalchemy import Boolean, Date, String, Text, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.database import Base
@@ -23,6 +23,9 @@ class Profile(UlidMixin, Base):
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     created_clubs: Mapped[list[Club]] = relationship(
         foreign_keys="Club.created_by", back_populates="creator"
     )

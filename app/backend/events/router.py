@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.backend.board_games.models import BoardGame
+from app.backend.board_games.schemas import BoardGameResponse
 from app.backend.clubs.models import (
     Club,
     ClubMember,
@@ -59,7 +61,7 @@ def active_event(db: Session, event_id: str) -> Event:
 
 
 def validate_schedule(event: Event, club: Club) -> None:
-    if club.club_type == ClubType.MOVIE:
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES}:
         return
     if event.start_date is None or event.end_date is None:
         raise HTTPException(status_code=422, detail="Start and end dates are required")
@@ -83,6 +85,19 @@ def validate_movie_link(db: Session, club: Club, linked_item_id: str | None) -> 
         raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
 
 
+def get_linked_board_game(
+    db: Session, club: Club, linked_item_id: str | None
+) -> BoardGame | None:
+    if club.club_type != ClubType.BOARD_GAMES:
+        return None
+    if linked_item_id is None or not linked_item_id.isdecimal():
+        raise HTTPException(status_code=422, detail="Select a game from the board game catalog")
+    game = db.get(BoardGame, int(linked_item_id))
+    if game is None:
+        raise HTTPException(status_code=422, detail="Select a game from the board game catalog")
+    return game
+
+
 def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
     response = EventResponse.model_validate(event)
     linked_movie = None
@@ -91,7 +106,15 @@ def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
             movie = db.get(Movie, int(event.linked_item_id))
             if movie is not None:
                 linked_movie = MovieResponse.model_validate(movie)
-    return response.model_copy(update={"linked_movie": linked_movie})
+    linked_board_game = None
+    if club.club_type == ClubType.BOARD_GAMES and event.linked_item_id is not None:
+        if event.linked_item_id.isdecimal():
+            board_game = db.get(BoardGame, int(event.linked_item_id))
+            if board_game is not None:
+                linked_board_game = BoardGameResponse.model_validate(board_game)
+    return response.model_copy(
+        update={"linked_movie": linked_movie, "linked_board_game": linked_board_game}
+    )
 
 
 @router.get("/clubs/{club_id}", response_model=list[EventResponse])
@@ -126,31 +149,36 @@ async def create_club_event(
 ) -> EventResponse:
     club = require_manager(db, club_id, profile.id)
     validate_movie_link(db, club, payload.linked_item_id)
-    if club.club_type != ClubType.MOVIE and (
+    board_game = get_linked_board_game(db, club, payload.linked_item_id)
+    if club.club_type not in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
         payload.start_date is None or payload.end_date is None
     ):
         raise HTTPException(status_code=422, detail="Start and end dates are required")
-    if club.club_type == ClubType.MOVIE and (
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
         payload.end_date is not None
         or payload.start_time is not None
         or payload.end_time is not None
     ):
         raise HTTPException(
             status_code=422,
-            detail="Movie club entries only support an optional start date",
+            detail="Movie and board game club entries only support an optional start date",
         )
     event = Event(
         club_id=club_id,
-        title=payload.title,
+        title=board_game.title if board_game is not None else payload.title,
         linked_item_id=payload.linked_item_id,
-        avatar_url=str(payload.avatar_url) if payload.avatar_url else None,
+        avatar_url=(
+            board_game.cover_image_url
+            if board_game is not None
+            else str(payload.avatar_url) if payload.avatar_url else None
+        ),
         start_date=payload.start_date,
-        end_date=payload.end_date,
-        start_time=payload.start_time,
-        end_time=payload.end_time,
+        end_date=None if board_game is not None else payload.end_date,
+        start_time=None if board_game is not None else payload.start_time,
+        end_time=None if board_game is not None else payload.end_time,
         status=(
             EventStatus.HELD
-            if club.club_type == ClubType.MOVIE
+            if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES}
             and payload.start_date is not None
             and payload.start_date < datetime.now(UTC).date()
             else EventStatus.SCHEDULED
@@ -178,15 +206,24 @@ async def update_event(
         changes.pop("avatar_url")
     for field, value in changes.items():
         setattr(event, field, value)
-    if club.club_type == ClubType.MOVIE and any(
+    board_game = get_linked_board_game(db, club, event.linked_item_id)
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES} and any(
         field in changes for field in ("start_date", "end_date", "start_time", "end_time")
     ) and (event.end_date is not None or event.start_time is not None or event.end_time is not None):
         raise HTTPException(
             status_code=422,
-            detail="Movie club entries only support an optional start date",
+            detail="Movie and board game club entries only support an optional start date",
         )
+    if board_game is not None:
+        event.title = board_game.title
+        event.avatar_url = board_game.cover_image_url
+        event.end_date = None
+        event.start_time = None
+        event.end_time = None
     validate_schedule(event, club)
     validate_movie_link(db, club, event.linked_item_id)
+    if club.club_type == ClubType.BOARD_GAMES and event.linked_item_id is None:
+        raise HTTPException(status_code=422, detail="Select a game from the board game catalog")
     db.commit()
     db.refresh(event)
     return to_event_response(db, event, club)

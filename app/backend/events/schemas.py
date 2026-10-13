@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 from app.backend.events.models import EventStatus
+from app.backend.board_games.schemas import BoardGameResponse
 from app.backend.movies.schemas import MovieResponse
 
 
@@ -60,6 +61,7 @@ class EventResponse(BaseModel):
     title: str | None
     linked_item_id: str | None
     linked_movie: MovieResponse | None = None
+    linked_board_game: BoardGameResponse | None = None
     avatar_url: str | None
     start_date: date | None
     end_date: date | None

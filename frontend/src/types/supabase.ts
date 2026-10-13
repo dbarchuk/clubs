@@ -35,6 +35,7 @@ export interface EventRecord {
   title: string | null
   linked_item_id: string | null
   linked_movie: MovieRecord | null
+  linked_board_game: BoardGameRecord | null
   avatar_url: string | null
   start_date: string | null
   end_date: string | null
@@ -65,6 +66,19 @@ export interface MovieSearchResult {
 
 export interface MovieRecord extends MovieSearchResult {
   id: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BoardGameRecord {
+  id: number
+  title: string
+  year_published: number | null
+  description: string | null
+  min_players: number | null
+  max_players: number | null
+  cover_image_url: string | null
   created_by: string
   created_at: string
   updated_at: string
