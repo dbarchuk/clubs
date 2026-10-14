@@ -35,7 +35,10 @@ def is_superuser_email(email: str) -> bool:
 
 def profile_response(profile: Profile) -> ProfileResponse:
     return ProfileResponse.model_validate(profile).model_copy(
-        update={"is_superuser": is_superuser_email(profile.email)}
+        update={
+            "is_active": profile.is_active,
+            "is_superuser": is_superuser_email(profile.email),
+        }
     )
 
 
