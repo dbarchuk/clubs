@@ -8,6 +8,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -133,6 +134,10 @@ def downgrade() -> None:
     op.drop_column('club_members', 'created_at')
     op.drop_index('ix_events_club_start', table_name='events')
     op.drop_table('events')
+    postgresql.ENUM(
+        'scheduled', 'delayed', 'cancelled', 'held', 'deleted',
+        name='event_status',
+    ).drop(op.get_bind(), checkfirst=True)
     op.drop_index('uq_club_invite_codes_one_active_per_club', table_name='club_invite_codes', postgresql_where=sa.text('revoked_at IS NULL'), sqlite_where=sa.text('revoked_at IS NULL'))
     op.drop_index('ix_club_invite_codes_club_id', table_name='club_invite_codes')
     op.drop_table('club_invite_codes')
