@@ -1,14 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.backend.board_games.models import BoardGame
+from app.backend.board_games.models import BoardGame, BoardGameTranslation
 from app.backend.board_games.schemas import BoardGameCreate, BoardGameResponse
 from app.backend.users.models import Profile
-from app.backend.users.router import get_current_profile
+from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/board-games", tags=["board-games"])
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/board-games", tags=["board-games"])
 @router.get("", response_model=list[BoardGameResponse])
 async def search_board_games(
     title: Annotated[str, Query(min_length=1, max_length=200)],
-    _: Annotated[Profile, Depends(get_current_profile)],
+    _: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[BoardGameResponse]:
     normalized_title = title.strip()
@@ -26,7 +26,14 @@ async def search_board_games(
 
     games = db.scalars(
         select(BoardGame)
-        .where(func.lower(BoardGame.title).contains(normalized_title.lower()))
+        .outerjoin(BoardGameTranslation)
+        .where(
+            or_(
+                func.lower(BoardGame.title).contains(normalized_title.lower()),
+                func.lower(BoardGameTranslation.title).contains(normalized_title.lower()),
+            )
+        )
+        .distinct()
         .order_by(BoardGame.title, BoardGame.year_published)
     ).all()
     return [BoardGameResponse.model_validate(game) for game in games]
@@ -35,14 +42,23 @@ async def search_board_games(
 @router.post("", response_model=BoardGameResponse, status_code=status.HTTP_201_CREATED)
 async def create_board_game(
     payload: BoardGameCreate,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> BoardGameResponse:
-    values = payload.model_dump(exclude={"cover_image_url"})
+    values = payload.model_dump(exclude={"cover_image_url", "translations"})
     game = BoardGame(
         **values,
         cover_image_url=(str(payload.cover_image_url) if payload.cover_image_url else None),
         created_by=profile.id,
+        translations=[
+            BoardGameTranslation(
+                locale=translation.locale,
+                title=translation.title.strip() if translation.title else None,
+                description=translation.description,
+            )
+            for translation in payload.translations
+            if translation.title or translation.description
+        ],
     )
     db.add(game)
     try:

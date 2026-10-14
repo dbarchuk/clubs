@@ -33,7 +33,7 @@ from app.backend.clubs.schemas import (
     PrivateClubJoin,
 )
 from app.backend.users.models import Profile
-from app.backend.users.router import get_current_profile
+from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/clubs", tags=["clubs"])
@@ -104,7 +104,7 @@ async def list_clubs(
     club_type: Annotated[ClubType | None, Query()] = None,
     scope: Annotated[Literal["my", "public"], Query()] = "my",
     search: Annotated[str | None, Query(max_length=100)] = None,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> PaginatedClubs:
     statement = select(Club).where(Club.deleted_at.is_(None))
@@ -157,7 +157,7 @@ async def list_clubs(
 @router.post("", response_model=ClubResponse, status_code=status.HTTP_201_CREATED)
 async def create_club(
     club_data: ClubCreate,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubResponse:
     club = Club(
@@ -182,7 +182,7 @@ async def create_club(
 async def update_club(
     club_id: str,
     club_data: ClubUpdate,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubResponse:
     club = require_club_manager(db, club_id, profile.id)
@@ -203,7 +203,7 @@ async def update_club(
 @router.post("/join-private", response_model=ClubJoinResponse)
 async def join_private_club(
     payload: PrivateClubJoin,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubJoinResponse:
     code_hash = get_code_hash(payload.invite_code)
@@ -244,7 +244,7 @@ async def join_private_club(
 @router.post("/{club_id}/join", response_model=ClubJoinResponse)
 async def join_public_club(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubJoinResponse:
     club = get_active_club(db, club_id)
@@ -275,7 +275,7 @@ async def join_public_club(
 @router.get("/{club_id}/members", response_model=list[ClubMemberResponse])
 async def list_club_members(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> list[ClubMemberResponse]:
     require_club_manager(db, club_id, profile.id)
@@ -303,7 +303,7 @@ async def update_club_member_role(
     club_id: str,
     member_id: str,
     payload: ClubMemberRoleUpdate,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubMemberResponse:
     require_club_manager(db, club_id, profile.id)
@@ -344,7 +344,7 @@ async def update_club_member_role(
 )
 async def list_invite_codes(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> list[ClubInviteCode]:
     club = require_club_manager(db, club_id, profile.id)
@@ -369,7 +369,7 @@ async def list_invite_codes(
 )
 async def create_invite_code(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> InviteCodeCreated:
     club = require_club_manager(db, club_id, profile.id)
@@ -414,7 +414,7 @@ async def create_invite_code(
 async def revoke_invite_code(
     club_id: str,
     invite_code_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubInviteCode:
     club = require_club_manager(db, club_id, profile.id)
@@ -440,7 +440,7 @@ async def revoke_invite_code(
     "/deletion-requests", response_model=list[ClubDeletionRequestResponse]
 )
 async def list_deletion_requests(
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> list[ClubDeletionRequest]:
     require_platform_admin(profile)
@@ -459,7 +459,7 @@ async def list_deletion_requests(
 async def review_deletion_request(
     request_id: str,
     decision: ClubDeletionReview,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubDeletionRequest:
     require_platform_admin(profile)
@@ -483,7 +483,7 @@ async def review_deletion_request(
 @router.get("/{club_id}", response_model=ClubResponse)
 async def get_club(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> ClubResponse:
     club = get_active_club(db, club_id)
@@ -498,7 +498,7 @@ async def get_club(
 @router.delete("/{club_id}", response_model=None)
 async def delete_club(
     club_id: str,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
 ) -> Response | JSONResponse:
     club = get_active_club(db, club_id)

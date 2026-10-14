@@ -7,7 +7,24 @@ export interface Profile {
   date_of_birth: string | null
   bio: string | null
   is_admin: boolean
+  is_active: boolean
+  is_superuser: boolean
   created_at: string
+}
+
+export interface ManagedUser {
+  id: string
+  email: string
+  display_name: string
+  is_active: boolean
+  is_admin: boolean
+  is_superuser: boolean
+  created_at: string
+}
+
+export interface UserManagementResponse {
+  users: ManagedUser[]
+  current_user_is_superuser: boolean
 }
 
 export interface ClubRecord {
@@ -62,6 +79,13 @@ export interface MovieSearchResult {
   original_language: string | null
   popularity: number | null
   vote_average: number | null
+  translations?: MovieTranslation[]
+}
+
+export interface MovieTranslation {
+  locale: string
+  title: string | null
+  overview: string | null
 }
 
 export interface MovieRecord extends MovieSearchResult {
@@ -69,6 +93,11 @@ export interface MovieRecord extends MovieSearchResult {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export interface LibraryMovie {
+  movie: MovieRecord
+  clubs: Array<{ id: string; title: string }>
 }
 
 export interface BoardGameRecord {
@@ -82,6 +111,13 @@ export interface BoardGameRecord {
   created_by: string
   created_at: string
   updated_at: string
+  translations?: BoardGameTranslation[]
+}
+
+export interface BoardGameTranslation {
+  locale: string
+  title: string | null
+  description: string | null
 }
 
 export interface InviteCodeResponse {

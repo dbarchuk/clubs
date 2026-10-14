@@ -11,13 +11,32 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.backend.users.models import Profile
-from app.backend.users.schemas import ProfileResponse
+from app.backend.users.schemas import (
+    ManagedUserResponse,
+    ManagedUserUpdate,
+    ProfileResponse,
+    UserManagementResponse,
+)
 from app.core.config import settings
 from app.core.database import get_db
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 security = HTTPBearer()
+
+
+def is_superuser_email(email: str) -> bool:
+    normalized = email.strip().lower()
+    return any(
+        configured.strip().lower() == normalized
+        for configured in settings.superuser_emails
+    )
+
+
+def profile_response(profile: Profile) -> ProfileResponse:
+    return ProfileResponse.model_validate(profile).model_copy(
+        update={"is_superuser": is_superuser_email(profile.email)}
+    )
 
 
 @dataclass(frozen=True)
@@ -139,14 +158,84 @@ async def get_current_profile(
     return profile
 
 
-@router.get("/me", response_model=ProfileResponse)
-async def get_me(profile: Profile = Depends(get_current_profile)) -> Profile:
+async def get_active_profile(
+    profile: Profile = Depends(get_current_profile),
+) -> Profile:
+    if not profile.is_active:
+        raise HTTPException(status_code=403, detail="This account is inactive")
     return profile
+
+
+@router.get("/me", response_model=ProfileResponse)
+async def get_me(profile: Profile = Depends(get_current_profile)) -> ProfileResponse:
+    return profile_response(profile)
+
+
+@router.get("/management", response_model=UserManagementResponse)
+async def get_user_management(
+    profile: Profile = Depends(get_active_profile),
+    db: Session = Depends(get_db),
+) -> UserManagementResponse:
+    superuser = is_superuser_email(profile.email)
+    if not profile.is_admin and not superuser:
+        raise HTTPException(status_code=403, detail="Administrator access is required")
+    users = db.scalars(select(Profile).order_by(Profile.display_name, Profile.email)).all()
+    return UserManagementResponse(
+        users=[
+            ManagedUserResponse(
+                id=user.id,
+                email=user.email,
+                display_name=user.display_name,
+                is_active=user.is_active,
+                is_admin=user.is_admin,
+                is_superuser=is_superuser_email(user.email),
+                created_at=user.created_at,
+            )
+            for user in users
+        ],
+        current_user_is_superuser=superuser,
+    )
+
+
+@router.patch("/management/{profile_id}", response_model=ManagedUserResponse)
+async def update_managed_user(
+    profile_id: str,
+    payload: ManagedUserUpdate,
+    actor: Profile = Depends(get_active_profile),
+    db: Session = Depends(get_db),
+) -> ManagedUserResponse:
+    actor_is_superuser = is_superuser_email(actor.email)
+    if not actor.is_admin and not actor_is_superuser:
+        raise HTTPException(status_code=403, detail="Administrator access is required")
+    target = db.get(Profile, profile_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if payload.is_active is False and actor.id == target.id:
+        raise HTTPException(status_code=403, detail="You cannot deactivate your own account")
+    if payload.is_active is False and is_superuser_email(target.email):
+        raise HTTPException(status_code=403, detail="Superuser accounts cannot be deactivated")
+    if payload.is_admin is False and target.is_admin and not actor_is_superuser:
+        raise HTTPException(status_code=403, detail="Only a superuser can remove administrator access")
+    if payload.is_active is not None:
+        target.is_active = payload.is_active
+    if payload.is_admin is not None:
+        target.is_admin = payload.is_admin
+    db.commit()
+    db.refresh(target)
+    return ManagedUserResponse(
+        id=target.id,
+        email=target.email,
+        display_name=target.display_name,
+        is_active=target.is_active,
+        is_admin=target.is_admin,
+        is_superuser=is_superuser_email(target.email),
+        created_at=target.created_at,
+    )
 
 
 @router.get("", response_model=list[dict[str, object]])
 async def list_users(
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
 ) -> list[dict[str, object]]:
     if not profile.is_admin:
         raise HTTPException(status_code=403, detail="Administrator access is required")
@@ -194,9 +283,9 @@ async def list_users(
 @router.put("/me", response_model=ProfileResponse)
 async def update_me(
     request: Request,
-    profile: Profile = Depends(get_current_profile),
+    profile: Profile = Depends(get_active_profile),
     db: Session = Depends(get_db),
-) -> Profile:
+) -> ProfileResponse:
     data = await request.json()
 
     if "display_name" in data:
@@ -224,4 +313,4 @@ async def update_me(
     db.commit()
     db.refresh(profile)
 
-    return profile
+    return profile_response(profile)

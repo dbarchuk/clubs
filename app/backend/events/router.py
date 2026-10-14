@@ -18,7 +18,7 @@ from app.backend.events.schemas import EventCreate, EventResponse, EventUpdate
 from app.backend.movies.models import Movie
 from app.backend.movies.schemas import MovieResponse
 from app.backend.users.models import Profile
-from app.backend.users.router import get_current_profile
+from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -120,7 +120,7 @@ def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
 @router.get("/clubs/{club_id}", response_model=list[EventResponse])
 async def list_club_events(
     club_id: str,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[EventResponse]:
     club = require_member(db, club_id, profile.id)
@@ -144,7 +144,7 @@ async def list_club_events(
 async def create_club_event(
     club_id: str,
     payload: EventCreate,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> EventResponse:
     club = require_manager(db, club_id, profile.id)
@@ -195,7 +195,7 @@ async def create_club_event(
 async def update_event(
     event_id: str,
     payload: EventUpdate,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> EventResponse:
     event = active_event(db, event_id)
@@ -232,7 +232,7 @@ async def update_event(
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: str,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
     event = active_event(db, event_id)

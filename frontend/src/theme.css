@@ -12,6 +12,8 @@
   --surface: #fff;
   --border: #e9e8e0;
   --muted: #777b71;
+  --link: #4f6c53;
+  --error: #a55e4c;
 }
 
 * { box-sizing: border-box; }
@@ -27,6 +29,8 @@ button:focus-visible, a:focus-visible { outline: 2px solid #789276; outline-offs
   --surface: #202520;
   --border: #353d35;
   --muted: #a9b2a7;
+  --link: #c3d6bf;
+  --error: #f0aaa0;
 }
 
 :root[data-theme='dark'] body,

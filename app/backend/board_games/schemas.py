@@ -3,6 +3,20 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 
+class BoardGameTranslationCreate(BaseModel):
+    locale: str = Field(min_length=2, max_length=6, pattern=r"^[a-z]{2,3}(?:-[A-Z]{2})?$")
+    title: str | None = Field(default=None, max_length=500)
+    description: str | None = None
+
+
+class BoardGameTranslationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    locale: str
+    title: str | None
+    description: str | None
+
+
 class BoardGameCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     year_published: int | None = Field(default=None, ge=1000, le=2200)
@@ -10,6 +24,7 @@ class BoardGameCreate(BaseModel):
     min_players: int | None = Field(default=None, ge=1)
     max_players: int | None = Field(default=None, ge=1)
     cover_image_url: HttpUrl | None = None
+    translations: list[BoardGameTranslationCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_player_range(self) -> "BoardGameCreate":
@@ -19,6 +34,15 @@ class BoardGameCreate(BaseModel):
             and self.max_players < self.min_players
         ):
             raise ValueError("max_players must be greater than or equal to min_players")
+        locales: set[str] = set()
+        for translation in self.translations:
+            if translation.locale in locales:
+                raise ValueError("translation locales must be unique")
+            locales.add(translation.locale)
+            if not (translation.title and translation.title.strip()) and not (
+                translation.description and translation.description.strip()
+            ):
+                raise ValueError("each translation must include a title or description")
         return self
 
 
@@ -35,3 +59,4 @@ class BoardGameResponse(BaseModel):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    translations: list[BoardGameTranslationResponse] = Field(default_factory=list)

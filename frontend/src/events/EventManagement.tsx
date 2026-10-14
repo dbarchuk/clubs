@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
+import { catalogLocale, localizedBoardGameDescription, localizedBoardGameTitle, localizedMovieTitle } from '../lib/catalog-localization'
 import type { BoardGameRecord, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
 import './events.css'
 
@@ -21,7 +22,7 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
 }
 
 export function EventManagement({ clubId, clubType, accessToken, canManage }: EventManagementProps) {
-  const { t } = useI18n()
+  const { t, language } = useI18n()
   const [events, setEvents] = useState<EventRecord[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -43,6 +44,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
   const [hasSearchedMovies, setHasSearchedMovies] = useState(false)
   const [selectedMovie, setSelectedMovie] = useState<MovieRecord | MovieSearchResult | null>(null)
   const [boardGameQuery, setBoardGameQuery] = useState('')
+  const [boardGameUkrainianTitle, setBoardGameUkrainianTitle] = useState('')
+  const [boardGameUkrainianDescription, setBoardGameUkrainianDescription] = useState('')
   const [boardGameResults, setBoardGameResults] = useState<BoardGameRecord[]>([])
   const [searchingBoardGames, setSearchingBoardGames] = useState(false)
   const [savingBoardGame, setSavingBoardGame] = useState(false)
@@ -79,6 +82,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setHasSearchedMovies(false)
     setSelectedMovie(null)
     setBoardGameQuery('')
+    setBoardGameUkrainianTitle('')
+    setBoardGameUkrainianDescription('')
     setBoardGameResults([])
     setSelectedBoardGame(null)
   }
@@ -91,7 +96,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setMovieResults([])
     setHasSearchedMovies(false)
     try {
-      const response = await fetch(`/api/movies?title=${encodeURIComponent(query)}`, {
+      const response = await fetch(`/api/movies?title=${encodeURIComponent(query)}&language=${encodeURIComponent(catalogLocale(language))}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('movieSearchError')))
@@ -146,12 +151,19 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
       const response = await fetch('/api/board-games', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ title: gameTitle }),
+        body: JSON.stringify({
+          title: gameTitle,
+          translations: boardGameUkrainianTitle.trim() || boardGameUkrainianDescription.trim()
+            ? [{ locale: 'uk-UA', title: boardGameUkrainianTitle.trim() || null, description: boardGameUkrainianDescription.trim() || null }]
+            : [],
+        }),
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSaveError')))
       const game = (await response.json()) as BoardGameRecord
       setSelectedBoardGame(game)
-      setBoardGameQuery(game.title)
+      setBoardGameQuery(localizedBoardGameTitle(game, language))
+      setBoardGameUkrainianTitle('')
+      setBoardGameUkrainianDescription('')
       setBoardGameResults([])
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : t('boardGameSaveError'))
@@ -162,14 +174,6 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
 
   const selectMovie = async (movie: MovieSearchResult) => {
     setError('')
-    if (movie.id !== null) {
-      setSelectedMovie(movie)
-      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : movie.title)
-      setMovieResults([])
-      setHasSearchedMovies(false)
-      return
-    }
-
     setSavingMovie(true)
     try {
       const response = await fetch('/api/movies', {
@@ -180,7 +184,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
       if (!response.ok) throw new Error(await errorMessage(response, t('movieSaveError')))
       const savedMovie = (await response.json()) as MovieRecord
       setSelectedMovie(savedMovie)
-      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : savedMovie.title)
+      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : localizedMovieTitle(savedMovie, language))
       setMovieResults([])
       setHasSearchedMovies(false)
     } catch (saveError) {
@@ -201,9 +205,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setStartTime(record.start_time?.slice(0, 5) ?? '')
     setEndTime(record.end_time?.slice(0, 5) ?? '')
     setSelectedMovie(record.linked_movie)
-    setMovieQuery(record.linked_movie?.title ?? '')
+    setMovieQuery(record.linked_movie ? localizedMovieTitle(record.linked_movie, language) : '')
     setSelectedBoardGame(record.linked_board_game)
-    setBoardGameQuery(record.linked_board_game?.title ?? '')
+    setBoardGameQuery(record.linked_board_game ? localizedBoardGameTitle(record.linked_board_game, language) : '')
     setBoardGameResults([])
     setMovieResults([])
     setHasSearchedMovies(false)
@@ -227,7 +231,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
         method: editingEvent ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
-          title: isBoardGameClub ? (selectedBoardGame?.title ?? null) : title.trim() || (isMovieClub ? selectedMovie?.title : null) || null,
+          title: isBoardGameClub
+            ? (selectedBoardGame?.title ?? null)
+            : title.trim() || (isMovieClub && selectedMovie ? localizedMovieTitle(selectedMovie, language) : null) || null,
           linked_item_id: isMovieClub ? (selectedMovie ? String(selectedMovie.id) : null) : isBoardGameClub ? (selectedBoardGame ? String(selectedBoardGame.id) : null) : (linkedItemId.trim() || null),
           avatar_url: isCatalogEvent ? null : (avatarUrl.trim() || null),
           start_date: startDate || null,
@@ -308,7 +314,18 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
   )
 
   function renderCatalogEvent(record: EventRecord) {
-    const linkedTitle = record.linked_movie?.title || record.linked_board_game?.title
+    const linkedTitle = record.linked_movie
+      ? localizedMovieTitle(record.linked_movie, language)
+      : record.linked_board_game ? localizedBoardGameTitle(record.linked_board_game, language) : null
+    const titleIsMovieMetadata = record.linked_movie && (
+      record.title === record.linked_movie.title
+      || record.linked_movie.translations?.some((translation) => translation.title === record.title)
+    )
+    const displayedTitle = record.linked_board_game
+      ? localizedBoardGameTitle(record.linked_board_game, language)
+      : record.linked_movie && titleIsMovieMetadata
+        ? localizedMovieTitle(record.linked_movie, language)
+        : record.title || linkedTitle || t('clubEvent')
     const linkedCover = record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url
     const cardContent = (
       <>
@@ -317,7 +334,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
           : <span className="movie-event-card-placeholder" aria-hidden="true" />}
         <span className="movie-event-card-content">
           <span className="movie-event-card-date">{record.start_date ?? t('eventQueue')}</span>
-          <strong>{record.title || linkedTitle || t('clubEvent')}</strong>
+          <strong>{displayedTitle}</strong>
           <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
         </span>
       </>
@@ -376,7 +393,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
               {selectedMovie && (
                 <div className="selected-movie">
                   {selectedMovie.cover_image_url && <img src={selectedMovie.cover_image_url} alt="" />}
-                  <span>{selectedMovie.title}{selectedMovie.release_date ? ` · ${selectedMovie.release_date.slice(0, 4)}` : ''}</span>
+                  <span>{localizedMovieTitle(selectedMovie, language)}{selectedMovie.release_date ? ` · ${selectedMovie.release_date.slice(0, 4)}` : ''}</span>
                   <button className="button button-light" type="button" onClick={() => { setSelectedMovie(null); setMovieQuery('') }}>{t('removeSelectedMovie')}</button>
                 </div>
               )}
@@ -387,7 +404,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
                     <li key={`${movie.provider}-${movie.external_id}`}>
                       <button type="button" onClick={() => void selectMovie(movie)} disabled={savingMovie}>
                         {movie.cover_image_url && <img src={movie.cover_image_url} alt="" />}
-                        <span><strong>{movie.title}</strong><small>{movie.release_date?.slice(0, 4) ?? t('unknownReleaseYear')} · {movie.id === null ? t('movieFromTmdb') : t('movieAlreadySaved')}</small></span>
+                        <span><strong>{localizedMovieTitle(movie, language)}</strong><small>{movie.release_date?.slice(0, 4) ?? t('unknownReleaseYear')} · {movie.id === null ? t('movieFromTmdb') : t('movieAlreadySaved')}</small></span>
                       </button>
                     </li>
                   ))}
@@ -398,6 +415,10 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
           ) : clubType === 'board_games' ? (
             <div className="movie-picker">
               <label className="club-form-field"><span>{t('searchBoardGames')}</span><input value={boardGameQuery} onChange={(event) => { setBoardGameQuery(event.target.value); setSelectedBoardGame(null); setBoardGameResults([]) }} onKeyDown={handleBoardGameSearchKeyDown} /></label>
+              {!selectedBoardGame && <>
+                <label className="club-form-field"><span>{t('ukrainianTitle')}</span><input value={boardGameUkrainianTitle} onChange={(event) => setBoardGameUkrainianTitle(event.target.value)} /></label>
+                <label className="club-form-field"><span>{t('ukrainianDescription')}</span><textarea value={boardGameUkrainianDescription} onChange={(event) => setBoardGameUkrainianDescription(event.target.value)} /></label>
+              </>}
               <div className="event-form-actions">
                 <button className="button button-light" type="button" onClick={() => void searchBoardGames()} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('search')}</button>
                 <button className="button button-light" type="button" onClick={() => void createBoardGame()} disabled={savingBoardGame || !boardGameQuery.trim()}>{savingBoardGame ? t('saving') : t('createBoardGame')}</button>
@@ -405,7 +426,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
               {selectedBoardGame && (
                 <div className="selected-movie">
                   {selectedBoardGame.cover_image_url && <img src={selectedBoardGame.cover_image_url} alt="" />}
-                  <span>{selectedBoardGame.title}</span>
+                  <span>{localizedBoardGameTitle(selectedBoardGame, language)}{localizedBoardGameDescription(selectedBoardGame, language) ? ` · ${localizedBoardGameDescription(selectedBoardGame, language)}` : ''}</span>
                   <button className="button button-light" type="button" onClick={() => { setSelectedBoardGame(null); setBoardGameQuery('') }}>{t('removeSelectedBoardGame')}</button>
                 </div>
               )}
@@ -414,9 +435,9 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
                 <ul className="movie-search-results" aria-label={t('boardGameSearchResults')}>
                   {boardGameResults.map((game) => (
                     <li key={game.id}>
-                      <button type="button" onClick={() => { setSelectedBoardGame(game); setBoardGameQuery(game.title); setBoardGameResults([]) }}>
+                      <button type="button" onClick={() => { setSelectedBoardGame(game); setBoardGameQuery(localizedBoardGameTitle(game, language)); setBoardGameResults([]) }}>
                         {game.cover_image_url && <img src={game.cover_image_url} alt="" />}
-                        <span><strong>{game.title}</strong><small>{t('boardGameAlreadySaved')}</small></span>
+                        <span><strong>{localizedBoardGameTitle(game, language)}</strong><small>{localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}</small></span>
                       </button>
                     </li>
                   ))}

@@ -27,10 +27,16 @@ Board game records provide shared metadata for games discussed by board game clu
 | `created_by` | Profile that added the game |
 | `created_at`, `updated_at` | Creation and last-update timestamps |
 
+## Localized metadata
+
+- `board_game_translations` stores optional localized `title` and `description` values keyed by (`board_game_id`, `locale`). The main board game row remains the fallback.
+- Board-game creation accepts optional translations. The event form supports adding a Ukrainian `uk-UA` title and description, and search matches translated titles as well as the base title.
+- API responses include stored translations; the frontend prefers the active language and falls back to the base fields.
+
 ## Catalog behavior
 
 - The catalog is populated by authenticated users through the create endpoint; there is no external search/import provider.
-- Search matches saved titles case-insensitively when they contain the requested title text. Results are ordered by title and then publication year.
+- Search matches base or translated titles case-insensitively when they contain the requested title text. Results are ordered by base title and then publication year.
 - Search results are read-only. The current API has no update or delete operation.
 - The catalog does not currently prevent duplicate entries or merge different editions.
 - Optional metadata may be absent. Missing cover art does not prevent a game from being created or returned.
@@ -45,7 +51,7 @@ Searches the local catalog by a required title query (1–200 characters) and re
 
 ### `POST /api/board-games`
 
-Creates a local catalog record from `BoardGameCreate` and returns the saved record with HTTP 201. The authenticated profile is assigned to `created_by`; clients cannot set the record ID, creator, or timestamps. Invalid field values return HTTP 422.
+Creates a local catalog record from `BoardGameCreate`, including optional locale/title/description translation records, and returns the saved record with HTTP 201. The authenticated profile is assigned to `created_by`; clients cannot set the record ID, creator, or timestamps. Invalid field values return HTTP 422.
 
 ## Example
 

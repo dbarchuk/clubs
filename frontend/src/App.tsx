@@ -6,8 +6,10 @@ import { ClubDeletionRequestsPage } from './pages/ClubDeletionRequestsPage'
 import { ClubManagementPage } from './pages/ClubManagementPage'
 import { ClubDetailsPage } from './pages/ClubDetailsPage'
 import { PublicHomePage } from './pages/PublicHomePage'
+import { LibraryPage } from './pages/LibraryPage'
+import { UserManagementPage } from './pages/UserManagementPage'
 import mainIcon from './assets/main_icon.png'
-import { Users, Globe2, LogOut, Search, ShieldCheck } from 'lucide-react'
+import { Users, Globe2, Library, LogOut, Search, ShieldCheck, UserCog } from 'lucide-react'
 import { Link, Navigate, NavLink, Routes, Route, useLocation } from 'react-router-dom'
 import { useState, type FormEvent } from 'react'
 import { useI18n } from './lib/i18n-context'
@@ -15,6 +17,7 @@ import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ThemeSwitcher } from './components/ThemeSwitcher'
 import { getInitials } from './lib/initials'
 import './clubs.css'
+import './pages/user-management.css'
 
 function App() {
   const { user, profile, loading, signOut } = useAuth()
@@ -29,6 +32,10 @@ function App() {
 
   if (!user) {
     return location.pathname === '/' ? <PublicHomePage /> : <LoginPage />
+  }
+
+  if (profile && !profile.is_active) {
+    return <section className="inactive-account-page" role="status"><h1>{t('userInactive')}</h1><p>{t('accountInactive')}</p><button className="button button-primary" type="button" onClick={() => { void signOut() }}>{t('signOut')}</button></section>
   }
 
   const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? t('member')
@@ -54,9 +61,17 @@ function App() {
           <NavLink to="/public-clubs" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             <Globe2 size={18} aria-hidden="true" /> <span>{t('publicClubs')}</span>
           </NavLink>
+          <NavLink to="/library" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            <Library size={18} aria-hidden="true" /> <span>{t('library')}</span>
+          </NavLink>
           {profile?.is_admin && (
             <NavLink to="/club-deletion-requests" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
               <ShieldCheck size={18} aria-hidden="true" /> <span>{t('clubDeletionRequests')}</span>
+            </NavLink>
+          )}
+          {(profile?.is_admin || profile?.is_superuser) && (
+            <NavLink to="/user-management" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+              <UserCog size={18} aria-hidden="true" /> <span>{t('userManagement')}</span>
             </NavLink>
           )}
         </nav>
@@ -116,6 +131,8 @@ function App() {
             />
             <Route path="/my-clubs" element={<ClubListPage key="my-clubs" scope="my" searchQuery={searchQuery} />} />
             <Route path="/public-clubs" element={<ClubListPage key="public-clubs" scope="public" searchQuery={searchQuery} />} />
+            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/user-management" element={<UserManagementPage />} />
             <Route path="/clubs/:clubId/manage" element={<ClubManagementPage />} />
             <Route path="/clubs/:clubId" element={<ClubDetailsPage />} />
             <Route path="/club-deletion-requests" element={<ClubDeletionRequestsPage />} />

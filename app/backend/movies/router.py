@@ -2,15 +2,24 @@ from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.backend.movies.clients.tmdb import TMDBMovieClient
-from app.backend.movies.models import Movie
-from app.backend.movies.schemas import MovieCreate, MovieResponse, MovieSearchResult
+from app.backend.clubs.models import Club, ClubMember, ClubType
+from app.backend.events.models import Event, EventStatus
+from app.backend.movies.models import Movie, MovieTranslation
+from app.backend.movies.schemas import (
+    LibraryClubReference,
+    LibraryMovieResponse,
+    MovieCreate,
+    MovieResponse,
+    MovieSearchResult,
+    MovieUpdate,
+)
 from app.backend.users.models import Profile
-from app.backend.users.router import get_current_profile
+from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/movies", tags=["movies"])
@@ -31,13 +40,139 @@ def movie_search_result(movie: Movie) -> MovieSearchResult:
         original_language=movie.original_language,
         popularity=movie.popularity,
         vote_average=movie.vote_average,
+        translations=[
+            {"locale": translation.locale, "title": translation.title, "overview": translation.overview}
+            for translation in movie.translations
+        ],
     )
+
+
+async def fetch_ukrainian_translation(
+    movie_id: str, base_movie: MovieSearchResult
+) -> MovieTranslation | None:
+    try:
+        translated = await movie_client.get_by_id(movie_id, language="uk-UA")
+    except (RuntimeError, httpx.HTTPError, ValueError):
+        return None
+    if translated is None:
+        return None
+    if (
+        translated.title == base_movie.title
+        and translated.overview == base_movie.overview
+    ):
+        return None
+    return MovieTranslation(
+        locale="uk-UA",
+        title=translated.title if translated.title else None,
+        overview=translated.overview or None,
+    )
+
+
+def update_movie_translations(movie: Movie, incoming: list[dict[str, str | None]]) -> None:
+    for translation_data in incoming:
+        locale = translation_data["locale"]
+        title = translation_data.get("title")
+        overview = translation_data.get("overview")
+        title = title.strip() if title and title.strip() else None
+        overview = overview.strip() if overview and overview.strip() else None
+        existing = next(
+            (translation for translation in movie.translations if translation.locale == locale),
+            None,
+        )
+        if title is None and overview is None:
+            if existing is not None:
+                movie.translations.remove(existing)
+            continue
+        if existing is None:
+            movie.translations.append(
+                MovieTranslation(locale=locale, title=title, overview=overview)
+            )
+        else:
+            existing.title = title
+            existing.overview = overview
+
+
+@router.get("/library", response_model=list[LibraryMovieResponse])
+async def list_library_movies(
+    profile: Annotated[Profile, Depends(get_active_profile)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[LibraryMovieResponse]:
+    if profile.is_admin:
+        movies = db.scalars(select(Movie).order_by(Movie.title, Movie.release_date)).all()
+        rows = [(movie, None) for movie in movies]
+        rows.extend(db.execute(
+            select(Movie, Club)
+            .join(Event, Event.linked_item_id == cast(Movie.id, String))
+            .join(Club, Club.id == Event.club_id)
+            .where(
+                Club.club_type == ClubType.MOVIE,
+                Club.deleted_at.is_(None),
+                Event.deleted_at.is_(None),
+                Event.status != EventStatus.DELETED,
+            )
+            .order_by(Movie.title, Movie.release_date, Club.title)
+        ).all())
+    else:
+        rows = db.execute(
+            select(Movie, Club)
+            .join(Event, Event.linked_item_id == cast(Movie.id, String))
+            .join(Club, Club.id == Event.club_id)
+            .join(ClubMember, ClubMember.club_id == Club.id)
+            .where(
+                ClubMember.user_id == profile.id,
+                Club.club_type == ClubType.MOVIE,
+                Club.deleted_at.is_(None),
+                Event.deleted_at.is_(None),
+                Event.status != EventStatus.DELETED,
+            )
+            .order_by(Movie.title, Movie.release_date, Club.title)
+        ).all()
+
+    movies: dict[int, LibraryMovieResponse] = {}
+    for movie, club in rows:
+        library_movie = movies.get(movie.id)
+        if library_movie is None:
+            library_movie = LibraryMovieResponse(
+                movie=MovieResponse.model_validate(movie),
+                clubs=[],
+            )
+            movies[movie.id] = library_movie
+        if club is not None and all(reference.id != club.id for reference in library_movie.clubs):
+            library_movie.clubs.append(
+                LibraryClubReference(id=club.id, title=club.title)
+            )
+    return list(movies.values())
+
+
+@router.patch("/{movie_id}", response_model=MovieResponse)
+async def update_movie(
+    movie_id: int,
+    payload: MovieUpdate,
+    profile: Annotated[Profile, Depends(get_active_profile)],
+    db: Annotated[Session, Depends(get_db)],
+) -> MovieResponse:
+    if not profile.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can edit movies")
+    movie = db.get(Movie, movie_id)
+    if movie is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
+    values = payload.model_dump(exclude_unset=True)
+    translations = values.pop("translations", None)
+    for field, value in values.items():
+        if field in {"title", "original_title"} and value is None:
+            raise HTTPException(status_code=422, detail=f"{field} cannot be null")
+        setattr(movie, field, value)
+    if translations is not None:
+        update_movie_translations(movie, translations)
+    db.commit()
+    db.refresh(movie)
+    return MovieResponse.model_validate(movie)
 
 
 @router.get(
     "",
     response_model=list[MovieSearchResult],
-    dependencies=[Depends(get_current_profile)],
+    dependencies=[Depends(get_active_profile)],
 )
 async def search_movies_by_title(
     title: Annotated[str, Query(min_length=1, max_length=200)],
@@ -52,7 +187,17 @@ async def search_movies_by_title(
 
     saved_movies = db.scalars(
         select(Movie)
-        .where(func.lower(Movie.title) == normalized_title.lower())
+        .outerjoin(
+            MovieTranslation,
+            and_(MovieTranslation.movie_id == Movie.id, MovieTranslation.locale == language),
+        )
+        .where(
+            or_(
+                func.lower(Movie.title) == normalized_title.lower(),
+                func.lower(MovieTranslation.title) == normalized_title.lower(),
+            )
+        )
+        .distinct()
         .order_by(Movie.id)
     ).all()
     if saved_movies:
@@ -80,7 +225,7 @@ async def search_movies_by_title(
 @router.post("", response_model=MovieResponse)
 async def save_selected_movie(
     payload: MovieCreate,
-    profile: Annotated[Profile, Depends(get_current_profile)],
+    profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> MovieResponse:
     existing_movie = db.scalar(
@@ -90,6 +235,14 @@ async def save_selected_movie(
         )
     )
     if existing_movie is not None:
+        if not any(translation.locale == "uk-UA" for translation in existing_movie.translations):
+            translation = await fetch_ukrainian_translation(
+                existing_movie.external_id, movie_search_result(existing_movie)
+            )
+            if translation is not None:
+                existing_movie.translations.append(translation)
+                db.commit()
+                db.refresh(existing_movie)
         return MovieResponse.model_validate(existing_movie)
 
     try:
@@ -113,6 +266,10 @@ async def save_selected_movie(
     if result is None:
         raise HTTPException(status_code=404, detail="Movie not found in TMDB")
 
+    ukrainian_translation = await fetch_ukrainian_translation(
+        payload.external_id, result
+    )
+
     movie = Movie(
         provider=result.provider,
         external_id=result.external_id,
@@ -126,6 +283,7 @@ async def save_selected_movie(
         popularity=result.popularity,
         vote_average=result.vote_average,
         created_by=profile.id,
+        translations=[ukrainian_translation] if ukrainian_translation else [],
     )
     db.add(movie)
     try:
@@ -143,6 +301,12 @@ async def save_selected_movie(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Movie could not be saved",
             )
+        if ukrainian_translation is not None and not any(
+            translation.locale == "uk-UA" for translation in existing_movie.translations
+        ):
+            existing_movie.translations.append(ukrainian_translation)
+            db.commit()
+            db.refresh(existing_movie)
         return MovieResponse.model_validate(existing_movie)
     db.refresh(movie)
     return MovieResponse.model_validate(movie)
