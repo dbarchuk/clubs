@@ -33,7 +33,7 @@ Cancelled and held events remain available to club members as history. A delayed
 - Start and end times are optional. When omitted, the event is all-day. When provided, the event is timed.
 - For a timed event, both start and end times are provided; the end must not precede the start when the dates are the same.
 - Events spanning multiple days are supported. The club's time zone should be used to interpret/display event times; the time-zone source needs confirmation.
-- Movie club entries represent the watch queue or a planned watch. Their start date is optional, and they do not have an end date or time. An entry without a start date appears in the queue. If a movie club entry is created with a start date before the current date, it is created with `held` status.
+- Movie club entries represent the watch queue or a planned watch and must link to a saved movie. Their start date is optional, and they do not have an end date or time. An entry without a start date appears in the queue. If a movie club entry is created with a start date before the current date, it is created with `held` status.
 - Board game club events link to a saved board game, use its title and cover image, and have an optional start date without an end date or times. A manager can select an existing game or create one while creating the event.
 - Book and sport club events continue to require start and end dates.
 - Delaying an event should not silently overwrite its original schedule. Whether the system keeps both original and revised scheduling details is an open question.
@@ -47,7 +47,7 @@ Cancelled and held events remain available to club members as history. A delayed
 - The event may have an optional `avatar_url`. When the associated item has an image, it can be used as the event avatar; for a book or movie this is its cover image. The UI uses a fallback when no avatar URL is available.
 - If no title is entered and no item is linked, the event is still valid and the UI can use a neutral label such as “Club event.”
 - Use a generic reference name such as `linked_item_id`, rather than embedding supported item kinds in the field name. The catalog item should carry its own kind/type so new kinds can be added without changing the event reference field. If items remain in separate tables, the association design must specify how the generic ID identifies its target.
-- Movie clubs let an event link to a saved movie. Movie search checks the local catalog for exact-title matches before querying TMDB; selecting a TMDB result saves it first, then links the new integer movie ID. Other catalog item types may use the generic reference in future.
+- Movie clubs require events to link to a saved movie. Movie search checks the local catalog for exact-title matches before querying TMDB; selecting a TMDB result saves it first, then links the new integer movie ID. Other catalog item types may use the generic reference in future.
 - Board game clubs require `linked_item_id` to identify a saved board game. The event title and image are derived from that game, so they are not separately editable on the event.
 
 ## Visibility

@@ -148,6 +148,8 @@ async def create_club_event(
     db: Annotated[Session, Depends(get_db)],
 ) -> EventResponse:
     club = require_manager(db, club_id, profile.id)
+    if club.club_type == ClubType.MOVIE and payload.linked_item_id is None:
+        raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
     validate_movie_link(db, club, payload.linked_item_id)
     board_game = get_linked_board_game(db, club, payload.linked_item_id)
     if club.club_type not in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
