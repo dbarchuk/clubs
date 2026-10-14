@@ -62,6 +62,8 @@ Returns all application profiles for an active administrator or superuser. Each 
 
 Accepts one or both of `is_active` and `is_admin`. Active administrators may activate/deactivate accounts and grant administrator access. Changing an existing administrator from `is_admin = true` to `false` requires a superuser. Superuser accounts and the current user's own account cannot be deactivated. The API enforces these rules regardless of frontend controls.
 
+User removal is by deactivation only. The application has no hard-delete operation for application profiles or Supabase Auth users; profile and authentication records are retained when `is_active` is set to `false`.
+
 ### `GET /api/users`
 
 Returns Supabase Auth user records, including user and app metadata, by paging through the Supabase admin users endpoint. It requires an active profile with `is_admin = true` and the server-side `SUPABASE_SECRET_KEY`. Other authenticated users receive HTTP 403. Missing configuration returns HTTP 503; an invalid upstream response or failed request returns HTTP 502.
@@ -80,7 +82,7 @@ Returns Supabase Auth user records, including user and app metadata, by paging t
 
 ## Out of scope
 
-Email changes, account deletion, and password recovery are not handled by application profile management. Profile field length validation remains enforced by the frontend only.
+Email changes and password recovery are not handled by application profile management. Hard deletion of users is not supported; inactive profile records remain stored. Profile field length validation remains enforced by the frontend only.
 
 ## Acceptance criteria represented by the current implementation
 
@@ -88,6 +90,7 @@ Email changes, account deletion, and password recovery are not handled by applic
 - An authenticated request to `GET /api/users/me` returns that user's profile and creates it if missing.
 - A user can update their own display name, avatar URL, date of birth, and bio; the response reflects the saved values.
 - A user cannot update their email, Supabase user ID, or admin flag through `PUT /api/users/me`.
+- User management can deactivate accounts but does not hard-delete application profiles or Supabase Auth users.
 - Invalid non-empty date values are rejected with HTTP 422.
 - `GET /api/users` requires authentication and server configuration for Supabase admin user listing.
 - Only superusers can demote an administrator; this rule is enforced by the API.
