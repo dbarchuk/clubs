@@ -45,7 +45,7 @@ export type TranslationKey =
   | 'copyInviteCode' | 'inviteCodeCopied' | 'inviteCodeCopyFailed' | 'inviteCodeNeedsReplacement'
   | 'eventsEyebrow' | 'clubEvents' | 'createEvent' | 'eventTitle' | 'linkedItemId'
   | 'eventAvatarUrl' | 'startDate' | 'endDate' | 'startTime' | 'endTime' | 'noEvents'
-  | 'searchMovies' | 'movieSearchResults' | 'movieFromTmdb' | 'movieAlreadySaved'
+  | 'searchMovies' | 'searchTmdb' | 'movieSearchResults' | 'movieFromTmdb' | 'movieAlreadySaved'
   | 'unknownReleaseYear' | 'noMovieResults' | 'movieSearchError' | 'movieSaveError'
   | 'searchBoardGames' | 'boardGameSearchResults' | 'boardGameAlreadySaved'
   | 'boardGameSearchError' | 'boardGameSaveError' | 'createBoardGame'

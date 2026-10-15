@@ -180,6 +180,7 @@ async def search_movies_by_title(
     year: Annotated[int | None, Query(ge=1870, le=2200)] = None,
     language: Annotated[str, Query(min_length=2, max_length=10)] = "en-US",
     page: Annotated[int, Query(ge=1)] = 1,
+    include_tmdb: bool = False,
 ) -> list[MovieSearchResult]:
     normalized_title = title.strip()
     if not normalized_title:
@@ -200,11 +201,12 @@ async def search_movies_by_title(
         .distinct()
         .order_by(Movie.id)
     ).all()
-    if saved_movies:
-        return [movie_search_result(movie) for movie in saved_movies]
+    saved_results = [movie_search_result(movie) for movie in saved_movies]
+    if saved_results and not include_tmdb:
+        return saved_results
 
     try:
-        return await movie_client.search_by_title(
+        tmdb_results = await movie_client.search_by_title(
             normalized_title,
             year=year,
             language=language,
@@ -220,6 +222,14 @@ async def search_movies_by_title(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unable to search the movie catalog",
         ) from exc
+
+    if not saved_results:
+        return tmdb_results
+
+    saved_external_ids = {movie.external_id for movie in saved_results}
+    return saved_results + [
+        movie for movie in tmdb_results if movie.external_id not in saved_external_ids
+    ]
 
 
 @router.post("", response_model=MovieResponse)

@@ -36,7 +36,8 @@ Additional image fields, such as `backdrop_image_url`, may be included when the 
 - `movie_translations` stores optional per-locale `title` and `overview` values keyed by (`movie_id`, `locale`). The main movie row remains the canonical fallback and keeps `original_title` and `original_language` from TMDB.
 - When a movie is selected or saved, the TMDB client requests both canonical `en-US` details and Ukrainian `uk-UA` details. A non-empty Ukrainian translation that differs from the canonical text is stored. If TMDB has no Ukrainian text or the localized request fails, the movie remains usable with its canonical values.
 - Admin movie editing can update or remove the Ukrainian title and overview. API responses include stored translations so the frontend can display Ukrainian with a canonical fallback.
-- Search requests use the active UI language for TMDB search and match saved records by both canonical and requested-locale title.
+- Search requests use `uk-UA` when the query contains Cyrillic text; otherwise they use the active UI language. Local search also matches the canonical and requested-locale titles.
+- Movie event search returns local title matches first. When local matches exist, the form offers a separate TMDB search that appends provider results after the local records and omits provider IDs already present locally.
 
 ## Source behavior
 

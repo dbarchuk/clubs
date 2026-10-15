@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { EventManagement } from '../events/EventManagement'
 import { useAuth } from '../lib/auth-context'
@@ -24,6 +25,7 @@ export function ClubDetailsPage() {
   const [club, setClub] = useState<ClubRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [eventFormOpen, setEventFormOpen] = useState(false)
 
   useEffect(() => {
     if (!clubId || !accessToken) return
@@ -42,14 +44,21 @@ export function ClubDetailsPage() {
   }, [accessToken, clubId, t])
 
   if (loading) return <p className="page-state" role="status">{t('loading')}</p>
-  if (error) return <section className="club-details-page"><p className="club-list-error" role="alert">{error}</p><Link to="/my-clubs">{t('backToMyClubs')}</Link></section>
+  if (error) return <section className="club-details-page"><p className="club-list-error" role="alert">{error}</p><Link className="button button-light" to="/my-clubs"><ArrowLeft aria-hidden="true" size={16} />{t('backToMyClubs')}</Link></section>
   if (!club || !clubId || !accessToken) return null
 
   const canManage = club.my_access_type === 'owner' || club.my_access_type === 'admin'
 
   return (
     <section className="club-details-page" aria-labelledby="club-details-title">
-      <Link to="/my-clubs">{t('backToMyClubs')}</Link>
+      <nav className="club-details-actions" aria-label={t('clubDetails')}>
+        <Link className="button button-light" to="/my-clubs"><ArrowLeft aria-hidden="true" size={16} />{t('backToMyClubs')}</Link>
+        {canManage && !eventFormOpen && (
+          <button className="button button-primary" type="button" onClick={() => setEventFormOpen(true)}>
+            <Plus aria-hidden="true" size={16} />{t('createEvent')}
+          </button>
+        )}
+      </nav>
       <header className="club-details-header">
         {club.avatar_url && <img src={club.avatar_url} alt="" />}
         <div>
@@ -59,7 +68,14 @@ export function ClubDetailsPage() {
         </div>
         {canManage && <Link className="button button-primary" to={`/clubs/${club.id}/manage`}>{t('clubManagement')}</Link>}
       </header>
-      <EventManagement clubId={club.id} clubType={club.club_type} accessToken={accessToken} canManage={canManage} />
+      <EventManagement
+        clubId={club.id}
+        clubType={club.club_type}
+        accessToken={accessToken}
+        canManage={canManage}
+        formOpen={eventFormOpen}
+        onFormOpenChange={setEventFormOpen}
+      />
     </section>
   )
 }

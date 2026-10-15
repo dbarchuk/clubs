@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
-import { catalogLocale, localizedBoardGameDescription, localizedBoardGameTitle, localizedMovieTitle } from '../lib/catalog-localization'
+import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedMovieTitle } from '../lib/catalog-localization'
 import type { BoardGameRecord, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
 import './events.css'
+
+const DEFAULT_NOTICE_DURATION_MS = 5_000
+const configuredNoticeDuration = Number(import.meta.env.VITE_NOTIFICATION_DURATION_MS)
+const noticeDurationMs = Number.isFinite(configuredNoticeDuration) && configuredNoticeDuration >= 0
+  ? configuredNoticeDuration
+  : DEFAULT_NOTICE_DURATION_MS
 
 interface EventManagementProps {
   clubId: string
   clubType: 'book' | 'movie' | 'sport' | 'board_games'
   accessToken: string
   canManage: boolean
+  formOpen: boolean
+  onFormOpenChange: (open: boolean) => void
 }
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
@@ -21,10 +29,9 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
   return fallback
 }
 
-export function EventManagement({ clubId, clubType, accessToken, canManage }: EventManagementProps) {
+export function EventManagement({ clubId, clubType, accessToken, canManage, formOpen, onFormOpenChange }: EventManagementProps) {
   const { t, language } = useI18n()
   const [events, setEvents] = useState<EventRecord[]>([])
-  const [formOpen, setFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searchingMovies, setSearchingMovies] = useState(false)
@@ -42,6 +49,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
   const [movieQuery, setMovieQuery] = useState('')
   const [movieResults, setMovieResults] = useState<MovieSearchResult[]>([])
   const [hasSearchedMovies, setHasSearchedMovies] = useState(false)
+  const [hasSearchedTmdbMovies, setHasSearchedTmdbMovies] = useState(false)
   const [selectedMovie, setSelectedMovie] = useState<MovieRecord | MovieSearchResult | null>(null)
   const [boardGameQuery, setBoardGameQuery] = useState('')
   const [boardGameUkrainianTitle, setBoardGameUkrainianTitle] = useState('')
@@ -67,9 +75,15 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     return () => { cancelled = true }
   }, [loadEvents, t])
 
+  useEffect(() => {
+    if (!notice) return
+    const timeoutId = window.setTimeout(() => setNotice(''), noticeDurationMs)
+    return () => window.clearTimeout(timeoutId)
+  }, [notice])
+
   const resetForm = () => {
     setEditingEvent(null)
-    setFormOpen(false)
+    onFormOpenChange(false)
     setTitle('')
     setLinkedItemId('')
     setAvatarUrl('')
@@ -80,6 +94,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setMovieQuery('')
     setMovieResults([])
     setHasSearchedMovies(false)
+    setHasSearchedTmdbMovies(false)
     setSelectedMovie(null)
     setBoardGameQuery('')
     setBoardGameUkrainianTitle('')
@@ -88,20 +103,29 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setSelectedBoardGame(null)
   }
 
-  const searchMovies = async () => {
+  const searchMovies = async (includeTmdb = false) => {
     const query = movieQuery.trim()
     if (!query) return
     setSearchingMovies(true)
     setError('')
-    setMovieResults([])
-    setHasSearchedMovies(false)
+    if (!includeTmdb) {
+      setMovieResults([])
+      setHasSearchedMovies(false)
+      setHasSearchedTmdbMovies(false)
+    }
     try {
-      const response = await fetch(`/api/movies?title=${encodeURIComponent(query)}&language=${encodeURIComponent(catalogLocale(language))}`, {
+      const params = new URLSearchParams({
+        title: query,
+        language: catalogLocaleForQuery(query, language),
+        ...(includeTmdb ? { include_tmdb: 'true' } : {}),
+      })
+      const response = await fetch(`/api/movies?${params.toString()}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('movieSearchError')))
       setMovieResults((await response.json()) as MovieSearchResult[])
       setHasSearchedMovies(true)
+      if (includeTmdb) setHasSearchedTmdbMovies(true)
     } catch (searchError) {
       setError(searchError instanceof Error ? searchError.message : t('movieSearchError'))
     } finally {
@@ -187,6 +211,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
       setTitle((currentTitle) => currentTitle.trim() ? currentTitle : localizedMovieTitle(savedMovie, language))
       setMovieResults([])
       setHasSearchedMovies(false)
+      setHasSearchedTmdbMovies(false)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : t('movieSaveError'))
     } finally {
@@ -196,7 +221,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
 
   const startEditing = (record: EventRecord) => {
     setEditingEvent(record)
-    setFormOpen(true)
+    onFormOpenChange(true)
     setTitle(record.title ?? '')
     setLinkedItemId(record.linked_item_id ?? '')
     setAvatarUrl(record.avatar_url ?? '')
@@ -211,6 +236,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
     setBoardGameResults([])
     setMovieResults([])
     setHasSearchedMovies(false)
+    setHasSearchedTmdbMovies(false)
     setError('')
     setNotice('')
   }
@@ -377,19 +403,24 @@ export function EventManagement({ clubId, clubType, accessToken, canManage }: Ev
   const eventListClassName = clubType === 'movie' || clubType === 'board_games' ? 'event-list movie-event-list' : 'event-list'
 
   return (
-    <section className="event-management" aria-labelledby="club-events-title">
-      <header><p>{t('eventsEyebrow')}</p><h2 id="club-events-title">{t('clubEvents')}</h2></header>
+    <section className="event-management" aria-label={t('clubEvents')}>
       {notice && <p role="status">{notice}</p>}
       {error && <p className="club-form-error" role="alert">{error}</p>}
-      {canManage && !formOpen && <button className="button button-primary event-create-trigger" type="button" onClick={() => { resetForm(); setFormOpen(true) }}>{t('createEvent')}</button>}
       {canManage && formOpen && (
         <form className="club-create-form" onSubmit={(event) => void saveEvent(event)}>
           <h3>{editingEvent ? t('editEvent') : t('createEvent')}</h3>
           <label className="club-form-field"><span>{t('eventTitle')}</span><input maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
           {clubType === 'movie' ? (
             <div className="movie-picker">
-              <label className="club-form-field"><span>{t('searchMovies')}</span><input value={movieQuery} onChange={(event) => { setMovieQuery(event.target.value); setSelectedMovie(null); setMovieResults([]); setHasSearchedMovies(false) }} onKeyDown={handleMovieSearchKeyDown} /></label>
-              <button className="button button-light" type="button" onClick={() => void searchMovies()} disabled={searchingMovies || !movieQuery.trim()}>{searchingMovies ? t('loading') : t('search')}</button>
+              <label className="club-form-field"><span>{t('searchMovies')}</span><input value={movieQuery} onChange={(event) => { setMovieQuery(event.target.value); setSelectedMovie(null); setMovieResults([]); setHasSearchedMovies(false); setHasSearchedTmdbMovies(false) }} onKeyDown={handleMovieSearchKeyDown} /></label>
+              <div className="event-form-actions movie-search-actions">
+                <button className="button button-light" type="button" onClick={() => void searchMovies()} disabled={searchingMovies || !movieQuery.trim()}>{searchingMovies ? t('loading') : t('search')}</button>
+                {hasSearchedMovies && !hasSearchedTmdbMovies && movieResults.some((movie) => movie.id !== null) && (
+                  <button className="button button-primary" type="button" onClick={() => void searchMovies(true)} disabled={searchingMovies}>
+                    {searchingMovies ? t('loading') : t('searchTmdb')}
+                  </button>
+                )}
+              </div>
               {selectedMovie && (
                 <div className="selected-movie">
                   {selectedMovie.cover_image_url && <img src={selectedMovie.cover_image_url} alt="" />}

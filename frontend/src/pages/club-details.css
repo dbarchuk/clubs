@@ -1,4 +1,6 @@
 .club-details-page { display: grid; gap: 1.5rem; padding-top: 18px; }
+.club-details-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.club-details-actions .button { gap: 8px; }
 .club-details-header { display: flex; align-items: center; gap: 18px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .club-details-header > img { width: 76px; height: 76px; border-radius: 10px; object-fit: cover; }
 .club-details-header > div { display: grid; flex: 1; gap: 5px; }

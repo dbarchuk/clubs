@@ -4,6 +4,10 @@ export function catalogLocale(language: 'uk' | 'en'): string {
   return language === 'uk' ? 'uk-UA' : 'en-US'
 }
 
+export function catalogLocaleForQuery(query: string, language: 'uk' | 'en'): string {
+  return /[\u0400-\u04FF]/u.test(query) ? 'uk-UA' : catalogLocale(language)
+}
+
 export function localizedMovieTitle(movie: MovieSearchResult, language: 'uk' | 'en'): string {
   if (language === 'uk') {
     const translation = movie.translations?.find((item) => item.locale === 'uk-UA')
