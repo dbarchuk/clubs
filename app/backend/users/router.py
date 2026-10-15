@@ -42,6 +42,15 @@ def profile_response(profile: Profile) -> ProfileResponse:
     )
 
 
+def ensure_superuser_admin(profile: Profile, db: Session) -> Profile:
+    if is_superuser_email(profile.email) and not profile.is_admin:
+        profile.is_admin = True
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    return profile
+
+
 @dataclass(frozen=True)
 class SupabaseUser:
     user_id: str
@@ -170,7 +179,11 @@ async def get_active_profile(
 
 
 @router.get("/me", response_model=ProfileResponse)
-async def get_me(profile: Profile = Depends(get_current_profile)) -> ProfileResponse:
+async def get_me(
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+) -> ProfileResponse:
+    profile = ensure_superuser_admin(profile, db)
     return profile_response(profile)
 
 

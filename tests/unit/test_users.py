@@ -113,6 +113,35 @@ def test_me_returns_inactive_status(
     assert response.json()["is_active"] is False
 
 
+def test_me_restores_admin_for_configured_superuser(
+    client: TestClient,
+    test_session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "superuser_emails", ["root@example.com"])
+    authenticate_as("root-user", "ROOT@example.com")
+    with test_session_factory() as session:
+        profile = Profile(
+            user_id="root-user",
+            email="root@example.com",
+            display_name="Root User",
+            is_admin=False,
+        )
+        session.add(profile)
+        session.commit()
+        profile_id = profile.id
+
+    response = client.get("/api/users/me", headers={"Authorization": "Bearer test"})
+
+    assert response.status_code == 200
+    assert response.json()["is_admin"] is True
+    assert response.json()["is_superuser"] is True
+    with test_session_factory() as session:
+        saved_profile = session.get(Profile, profile_id)
+        assert saved_profile is not None
+        assert saved_profile.is_admin is True
+
+
 def test_me_can_update_profile_fields(
     client: TestClient,
     test_session_factory: sessionmaker[Session],

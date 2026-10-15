@@ -67,7 +67,7 @@ Cancelled and held events remain available to club members as history. A delayed
 | `club_id` | Required reference to the owning club |
 | `title` | Optional user-provided title; for board game events it is derived from the linked game |
 | `linked_item_id` | Optional reference to an associated catalog item; required for board game club events |
-| `avatar_url` | Optional image URL; for board game events it is derived from the linked game's cover |
+| `avatar_url` | Optional image URL; for movie and board game entries it is derived from the linked catalog item's cover |
 | `start_date` | Required for book and sport events; optional for movie queue entries and board game events |
 | `end_date` | Required for book and sport events, on or after `start_date`; null for movie and board game entries |
 | `start_time` | Optional for book and sport events; null for all-day events and movie/board game entries |

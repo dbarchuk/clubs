@@ -7,12 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.backend.board_games.models import BoardGame
 from app.backend.board_games.schemas import BoardGameResponse
-from app.backend.clubs.models import (
-    Club,
-    ClubMember,
-    ClubMemberAccessType,
-    ClubType,
-)
+from app.backend.clubs.models import Club, ClubType
+from app.backend.clubs.permissions import require_manager, require_member
 from app.backend.events.models import Event, EventStatus
 from app.backend.events.schemas import EventCreate, EventResponse, EventUpdate
 from app.backend.movies.models import Movie
@@ -22,29 +18,6 @@ from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/events", tags=["events"])
-
-
-def require_member(db: Session, club_id: str, profile_id: str) -> Club:
-    club = db.scalar(
-        select(Club).where(Club.id == club_id, Club.deleted_at.is_(None))
-    )
-    if club is None:
-        raise HTTPException(status_code=404, detail="Club not found")
-    membership = db.get(ClubMember, (club_id, profile_id))
-    if membership is None:
-        raise HTTPException(status_code=403, detail="Club membership is required")
-    return club
-
-
-def require_manager(db: Session, club_id: str, profile_id: str) -> Club:
-    club = require_member(db, club_id, profile_id)
-    membership = db.get(ClubMember, (club_id, profile_id))
-    if membership is None or membership.access_type not in {
-        ClubMemberAccessType.OWNER,
-        ClubMemberAccessType.ADMIN,
-    }:
-        raise HTTPException(status_code=403, detail="Club manager access is required")
-    return club
 
 
 def active_event(db: Session, event_id: str) -> Event:
@@ -78,11 +51,15 @@ def validate_schedule(event: Event, club: Club) -> None:
         raise HTTPException(status_code=422, detail="End time must not be before start time")
 
 
-def validate_movie_link(db: Session, club: Club, linked_item_id: str | None) -> None:
+def validate_movie_link(
+    db: Session, club: Club, linked_item_id: str | None
+) -> Movie | None:
     if club.club_type != ClubType.MOVIE or linked_item_id is None:
-        return
-    if not linked_item_id.isdecimal() or db.get(Movie, int(linked_item_id)) is None:
+        return None
+    movie = db.get(Movie, int(linked_item_id)) if linked_item_id.isdecimal() else None
+    if movie is None:
         raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
+    return movie
 
 
 def get_linked_board_game(
@@ -150,7 +127,7 @@ async def create_club_event(
     club = require_manager(db, club_id, profile.id)
     if club.club_type == ClubType.MOVIE and payload.linked_item_id is None:
         raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
-    validate_movie_link(db, club, payload.linked_item_id)
+    movie = validate_movie_link(db, club, payload.linked_item_id)
     board_game = get_linked_board_game(db, club, payload.linked_item_id)
     if club.club_type not in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
         payload.start_date is None or payload.end_date is None
@@ -172,6 +149,8 @@ async def create_club_event(
         avatar_url=(
             board_game.cover_image_url
             if board_game is not None
+            else movie.cover_image_url
+            if movie is not None
             else str(payload.avatar_url) if payload.avatar_url else None
         ),
         start_date=payload.start_date,
@@ -223,7 +202,9 @@ async def update_event(
         event.start_time = None
         event.end_time = None
     validate_schedule(event, club)
-    validate_movie_link(db, club, event.linked_item_id)
+    movie = validate_movie_link(db, club, event.linked_item_id)
+    if movie is not None:
+        event.avatar_url = movie.cover_image_url
     if club.club_type == ClubType.BOARD_GAMES and event.linked_item_id is None:
         raise HTTPException(status_code=422, detail="Select a game from the board game catalog")
     db.commit()
