@@ -14,7 +14,12 @@
 .library-movie-card-trigger { display: block; width: 100%; padding: 0; border: 0; color: inherit; text-align: left; background: transparent; }
 .library-movie-card-trigger { cursor: pointer; }
 .library-movie-card-trigger:hover h3 { color: var(--link); }
-.library-movie-card-trigger > img, .library-movie-placeholder { display: grid; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: var(--surface); }
+.library-movie-card-trigger > img, .library-board-game-card > img, .library-movie-placeholder { display: grid; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: var(--surface); }
+.library-board-game-card > img, .library-board-game-card > .library-movie-placeholder, .library-board-game-edit-trigger > img, .library-board-game-edit-trigger > .library-movie-placeholder { height: 140px; aspect-ratio: auto; object-fit: contain; padding: 8px; }
+.library-board-game-edit-trigger { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.library-board-game-edit-trigger:focus-visible, .library-board-game-edit-title:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.library-board-game-edit-title { padding: 0; border: 0; color: inherit; font: inherit; text-align: left; background: transparent; cursor: pointer; }
+.library-board-game-edit-title:hover { color: var(--link); }
 .library-movie-placeholder { place-items: center; color: var(--muted); }
 .library-movie-details { display: grid; gap: 6px; padding: 10px; }
 .library-movie-details h3 { overflow: hidden; margin: 0; font: 600 13px/1.35 var(--serif); text-overflow: ellipsis; }

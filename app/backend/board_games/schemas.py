@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -46,6 +47,27 @@ class BoardGameCreate(BaseModel):
         return self
 
 
+class BoardGameUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=500)
+    year_published: int | None = Field(default=None, ge=1000, le=2200)
+    description: str | None = None
+    min_players: int | None = Field(default=None, ge=1)
+    max_players: int | None = Field(default=None, ge=1)
+    cover_image_url: HttpUrl | None = None
+    translations: list[BoardGameTranslationCreate] | None = None
+
+    @model_validator(mode="after")
+    def validate_translations(self) -> "BoardGameUpdate":
+        if self.translations is None:
+            return self
+        locales: set[str] = set()
+        for translation in self.translations:
+            if translation.locale in locales:
+                raise ValueError("translation locales must be unique")
+            locales.add(translation.locale)
+        return self
+
+
 class BoardGameResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -60,3 +82,26 @@ class BoardGameResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     translations: list[BoardGameTranslationResponse] = Field(default_factory=list)
+
+
+class BoardGameProviderResult(BaseModel):
+    """A search hit from an external board game catalog, not yet saved locally."""
+
+    id: None = None
+    provider: Literal["geekach"]
+    external_id: str
+    title: str
+    cover_image_url: str | None = None
+    product_url: str
+    price: float | None = None
+    in_stock: bool | None = None
+
+
+class BoardGameClubReference(BaseModel):
+    id: str
+    title: str
+
+
+class LibraryBoardGameResponse(BaseModel):
+    board_game: BoardGameResponse
+    clubs: list[BoardGameClubReference]

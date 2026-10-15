@@ -100,6 +100,11 @@ export interface LibraryMovie {
   clubs: Array<{ id: string; title: string }>
 }
 
+export interface LibraryBoardGame {
+  board_game: BoardGameRecord
+  clubs: Array<{ id: string; title: string }>
+}
+
 export interface BoardGameRecord {
   id: number
   title: string
@@ -113,6 +118,19 @@ export interface BoardGameRecord {
   updated_at: string
   translations?: BoardGameTranslation[]
 }
+
+export interface BoardGameProviderResult {
+  id: null
+  provider: 'geekach'
+  external_id: string
+  title: string
+  cover_image_url: string | null
+  product_url: string
+  price: number | null
+  in_stock: boolean | null
+}
+
+export type BoardGameSearchResult = BoardGameRecord | BoardGameProviderResult
 
 export interface BoardGameTranslation {
   locale: string

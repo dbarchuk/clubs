@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
 import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedMovieTitle } from '../lib/catalog-localization'
-import type { BoardGameRecord, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
+import type { BoardGameRecord, BoardGameSearchResult, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
 import './events.css'
 
 const DEFAULT_NOTICE_DURATION_MS = 5_000
@@ -54,7 +54,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [boardGameQuery, setBoardGameQuery] = useState('')
   const [boardGameUkrainianTitle, setBoardGameUkrainianTitle] = useState('')
   const [boardGameUkrainianDescription, setBoardGameUkrainianDescription] = useState('')
-  const [boardGameResults, setBoardGameResults] = useState<BoardGameRecord[]>([])
+  const [boardGameResults, setBoardGameResults] = useState<BoardGameSearchResult[]>([])
   const [searchingBoardGames, setSearchingBoardGames] = useState(false)
   const [savingBoardGame, setSavingBoardGame] = useState(false)
   const [selectedBoardGame, setSelectedBoardGame] = useState<BoardGameRecord | null>(null)
@@ -151,7 +151,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         headers: { Authorization: `Bearer ${accessToken}` },
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSearchError')))
-      setBoardGameResults((await response.json()) as BoardGameRecord[])
+      setBoardGameResults((await response.json()) as BoardGameSearchResult[])
     } catch (searchError) {
       setError(searchError instanceof Error ? searchError.message : t('boardGameSearchError'))
     } finally {
@@ -177,6 +177,42 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
           title: gameTitle,
+          translations: boardGameUkrainianTitle.trim() || boardGameUkrainianDescription.trim()
+            ? [{ locale: 'uk-UA', title: boardGameUkrainianTitle.trim() || null, description: boardGameUkrainianDescription.trim() || null }]
+            : [],
+        }),
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSaveError')))
+      const game = (await response.json()) as BoardGameRecord
+      setSelectedBoardGame(game)
+      setBoardGameQuery(localizedBoardGameTitle(game, language))
+      setBoardGameUkrainianTitle('')
+      setBoardGameUkrainianDescription('')
+      setBoardGameResults([])
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : t('boardGameSaveError'))
+    } finally {
+      setSavingBoardGame(false)
+    }
+  }
+
+  const selectBoardGame = async (result: BoardGameSearchResult) => {
+    if (result.id !== null) {
+      setSelectedBoardGame(result)
+      setBoardGameQuery(localizedBoardGameTitle(result, language))
+      setBoardGameResults([])
+      return
+    }
+
+    setSavingBoardGame(true)
+    setError('')
+    try {
+      const response = await fetch('/api/board-games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          title: result.title,
+          cover_image_url: result.cover_image_url,
           translations: boardGameUkrainianTitle.trim() || boardGameUkrainianDescription.trim()
             ? [{ locale: 'uk-UA', title: boardGameUkrainianTitle.trim() || null, description: boardGameUkrainianDescription.trim() || null }]
             : [],
@@ -465,10 +501,10 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
               {boardGameResults.length > 0 && (
                 <ul className="movie-search-results" aria-label={t('boardGameSearchResults')}>
                   {boardGameResults.map((game) => (
-                    <li key={game.id}>
-                      <button type="button" onClick={() => { setSelectedBoardGame(game); setBoardGameQuery(localizedBoardGameTitle(game, language)); setBoardGameResults([]) }}>
+                    <li key={game.id === null ? `${game.provider}-${game.external_id}` : `local-${game.id}`}>
+                      <button type="button" onClick={() => void selectBoardGame(game)} disabled={savingBoardGame}>
                         {game.cover_image_url && <img src={game.cover_image_url} alt="" />}
-                        <span><strong>{localizedBoardGameTitle(game, language)}</strong><small>{localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}</small></span>
+                        <span><strong>{game.id === null ? game.title : localizedBoardGameTitle(game, language)}</strong><small>{game.id === null ? `${t('boardGameFromGeekach')}${game.price === null ? '' : ` · ${game.price} ₴`}${game.in_stock === false ? ` · ${t('unavailable')}` : ''}` : localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}</small></span>
                       </button>
                     </li>
                   ))}
