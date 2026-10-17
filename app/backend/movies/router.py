@@ -1,8 +1,9 @@
-from typing import Annotated
+import logging
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import String, and_, cast, func, or_, select
+from sqlalchemy import String, and_, cast, extract, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,12 +19,16 @@ from app.backend.movies.schemas import (
     MovieSearchResult,
     MovieUpdate,
 )
+from app.backend.library import my_club_item_ids
 from app.backend.users.models import Profile
 from app.backend.users.router import get_active_profile
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import log_external_error
 
 router = APIRouter(prefix="/movies", tags=["movies"])
 movie_client = TMDBMovieClient()
+logger = logging.getLogger(__name__)
 
 
 def movie_search_result(movie: Movie) -> MovieSearchResult:
@@ -52,7 +57,16 @@ async def fetch_ukrainian_translation(
 ) -> MovieTranslation | None:
     try:
         translated = await movie_client.get_by_id(movie_id, language="uk-UA")
-    except (RuntimeError, httpx.HTTPError, ValueError):
+    except RuntimeError:
+        return None
+    except (httpx.HTTPError, ValueError) as exc:
+        configured_key = settings.tmdb_api_key
+        log_external_error(
+            logger,
+            "TMDB Ukrainian translation lookup failed",
+            exc,
+            secrets=(configured_key.get_secret_value(),) if configured_key else (),
+        )
         return None
     if translated is None:
         return None
@@ -96,52 +110,57 @@ def update_movie_translations(movie: Movie, incoming: list[dict[str, str | None]
 async def list_library_movies(
     profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
+    scope: Literal["all", "mine"] = "all",
+    year_from: Annotated[int | None, Query(ge=1000, le=2200)] = None,
+    year_to: Annotated[int | None, Query(ge=1000, le=2200)] = None,
+    sort: Literal["date_added", "year_released"] = "date_added",
 ) -> list[LibraryMovieResponse]:
-    if profile.is_admin:
-        movies = db.scalars(select(Movie).order_by(Movie.title, Movie.release_date)).all()
-        rows = [(movie, None) for movie in movies]
-        rows.extend(db.execute(
-            select(Movie, Club)
-            .join(Event, Event.linked_item_id == cast(Movie.id, String))
-            .join(Club, Club.id == Event.club_id)
-            .where(
-                Club.club_type == ClubType.MOVIE,
-                Club.deleted_at.is_(None),
-                Event.deleted_at.is_(None),
-                Event.status != EventStatus.DELETED,
-            )
-            .order_by(Movie.title, Movie.release_date, Club.title)
-        ).all())
-    else:
-        rows = db.execute(
-            select(Movie, Club)
-            .join(Event, Event.linked_item_id == cast(Movie.id, String))
-            .join(Club, Club.id == Event.club_id)
-            .join(ClubMember, ClubMember.club_id == Club.id)
-            .where(
-                ClubMember.user_id == profile.id,
-                Club.club_type == ClubType.MOVIE,
-                Club.deleted_at.is_(None),
-                Event.deleted_at.is_(None),
-                Event.status != EventStatus.DELETED,
-            )
-            .order_by(Movie.title, Movie.release_date, Club.title)
-        ).all()
-
-    movies: dict[int, LibraryMovieResponse] = {}
-    for movie, club in rows:
-        library_movie = movies.get(movie.id)
-        if library_movie is None:
-            library_movie = LibraryMovieResponse(
-                movie=MovieResponse.model_validate(movie),
-                clubs=[],
-            )
-            movies[movie.id] = library_movie
-        if club is not None and all(reference.id != club.id for reference in library_movie.clubs):
-            library_movie.clubs.append(
-                LibraryClubReference(id=club.id, title=club.title)
-            )
-    return list(movies.values())
+    if year_from is not None and year_to is not None and year_from > year_to:
+        raise HTTPException(status_code=422, detail="year_from must be on or before year_to")
+    query = select(Movie)
+    if scope == "mine":
+        query = query.where(
+            cast(Movie.id, String).in_(my_club_item_ids(ClubType.MOVIE, profile.id))
+        )
+    release_year = extract("year", Movie.release_date)
+    if year_from is not None:
+        query = query.where(release_year >= year_from)
+    if year_to is not None:
+        query = query.where(release_year <= year_to)
+    query = query.order_by(
+        Movie.created_at.desc()
+        if sort == "date_added"
+        else Movie.release_date.desc().nulls_last(),
+        Movie.title,
+    )
+    movies = db.scalars(query).all()
+    library = {
+        movie.id: LibraryMovieResponse(
+            movie=MovieResponse.model_validate(movie),
+            clubs=[],
+        )
+        for movie in movies
+    }
+    rows = db.execute(
+        select(Movie.id, Club)
+        .select_from(Event)
+        .join(Movie, Event.linked_item_id == cast(Movie.id, String))
+        .join(Club, Club.id == Event.club_id)
+        .join(ClubMember, ClubMember.club_id == Club.id)
+        .where(
+            ClubMember.user_id == profile.id,
+            Club.club_type == ClubType.MOVIE,
+            Club.deleted_at.is_(None),
+            Event.deleted_at.is_(None),
+            Event.status != EventStatus.DELETED,
+        )
+        .order_by(Club.title)
+    ).all()
+    for movie_id, club in rows:
+        entry = library.get(movie_id)
+        if entry is not None and all(reference.id != club.id for reference in entry.clubs):
+            entry.clubs.append(LibraryClubReference(id=club.id, title=club.title))
+    return list(library.values())
 
 
 @router.patch("/{movie_id}", response_model=MovieResponse)
@@ -218,6 +237,13 @@ async def search_movies_by_title(
             detail="Movie catalog is not configured",
         ) from exc
     except (httpx.HTTPError, ValueError) as exc:
+        configured_key = settings.tmdb_api_key
+        log_external_error(
+            logger,
+            "TMDB movie search failed",
+            exc,
+            secrets=(configured_key.get_secret_value(),) if configured_key else (),
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unable to search the movie catalog",
@@ -268,6 +294,13 @@ async def save_selected_movie(
             detail="Invalid TMDB movie ID",
         ) from exc
     except httpx.HTTPError as exc:
+        configured_key = settings.tmdb_api_key
+        log_external_error(
+            logger,
+            "TMDB movie lookup failed",
+            exc,
+            secrets=(configured_key.get_secret_value(),) if configured_key else (),
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unable to retrieve movie details",

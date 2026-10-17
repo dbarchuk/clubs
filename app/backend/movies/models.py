@@ -6,12 +6,16 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Select,
+    func,
+    select,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, query_expression, relationship, with_expression
 
+from app.backend.reviews.models import MovieReview
 from app.core.database import Base
 from app.core.models import OwnedModelMixin
 
@@ -44,9 +48,23 @@ class Movie(OwnedModelMixin, Base):
     original_language: Mapped[str | None] = mapped_column(String(10), nullable=True)
     popularity: Mapped[float | None] = mapped_column(Float, nullable=True)
     vote_average: Mapped[float | None] = mapped_column(Float, nullable=True)
+    average_rating: Mapped[float | None] = query_expression()
     translations: Mapped[list["MovieTranslation"]] = relationship(
         back_populates="movie", cascade="all, delete-orphan", passive_deletes=True
     )
+    reviews: Mapped[list[MovieReview]] = relationship(
+        back_populates="movie", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @classmethod
+    def with_average_rating(cls, statement: Select) -> Select:
+        average_rating = (
+            select(func.avg(MovieReview.rating))
+            .where(MovieReview.movie_id == cls.id, MovieReview.is_public.is_(True))
+            .correlate_except(MovieReview)
+            .scalar_subquery()
+        )
+        return statement.options(with_expression(cls.average_rating, average_rating))
 
 
 class MovieTranslation(Base):

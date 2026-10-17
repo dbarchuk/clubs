@@ -3,11 +3,60 @@ import { BookOpen, Dice5, Film } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
 import { useI18n } from '../lib/i18n-context'
-import { localizedBoardGameTitle, localizedMovieOverview, localizedMovieTitle } from '../lib/catalog-localization'
-import type { BoardGameRecord, LibraryBoardGame, LibraryMovie } from '../types/supabase'
+import { localizedBoardGameTitle, localizedBookDescription, localizedBookTitle, localizedMovieOverview, localizedMovieTitle } from '../lib/catalog-localization'
+import { ReviewPanel } from '../reviews/ReviewPanel'
+import type { BookRecord, BoardGameRecord, LibraryBoardGame, LibraryBook, LibraryMovie, ReviewCatalogType } from '../types/supabase'
 import './library.css'
 
 type LibraryTab = 'movies' | 'books' | 'board-games'
+type LibraryScope = 'all' | 'mine'
+type LibrarySort = 'date_added' | 'year_released'
+
+function isValidYear(value: string): boolean {
+  return /^\d{4}$/.test(value) && Number(value) >= 1000 && Number(value) <= 2200
+}
+
+interface LibraryFiltersProps {
+  scope: LibraryScope
+  setScope: (scope: LibraryScope) => void
+  yearFrom: string
+  setYearFrom: (year: string) => void
+  yearTo: string
+  setYearTo: (year: string) => void
+  sort: LibrarySort
+  setSort: (sort: LibrarySort) => void
+}
+
+function LibraryFilters({ scope, setScope, yearFrom, setYearFrom, yearTo, setYearTo, sort, setSort }: LibraryFiltersProps) {
+  const { t } = useI18n()
+  return (
+    <details className="library-filters">
+      <summary>{t('libraryFilters')}</summary>
+      <div className="library-filter-grid">
+        <label>{t('libraryScope')}
+          <select value={scope} onChange={(event) => setScope(event.target.value as LibraryScope)}>
+            <option value="mine">{t('libraryMine')}</option>
+            <option value="all">{t('libraryAll')}</option>
+          </select>
+        </label>
+        <label>{t('yearFrom')}<input type="number" min={1000} max={2200} value={yearFrom} onChange={(event) => setYearFrom(event.target.value)} /></label>
+        <label>{t('yearTo')}<input type="number" min={1000} max={2200} value={yearTo} onChange={(event) => setYearTo(event.target.value)} /></label>
+        <label>{t('librarySort')}
+          <select value={sort} onChange={(event) => setSort(event.target.value as LibrarySort)}>
+            <option value="date_added">{t('sortDateAdded')}</option>
+            <option value="year_released">{t('sortYearReleased')}</option>
+          </select>
+        </label>
+      </div>
+    </details>
+  )
+}
+
+interface ReviewTarget {
+  catalogType: ReviewCatalogType
+  itemId: number
+  title: string
+}
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   try {
@@ -33,25 +82,42 @@ export function LibraryPage() {
   const accessToken = session?.access_token
   const [movies, setMovies] = useState<LibraryMovie[]>([])
   const [boardGames, setBoardGames] = useState<LibraryBoardGame[]>([])
+  const [books, setBooks] = useState<LibraryBook[]>([])
   const [loading, setLoading] = useState(true)
   const [boardGamesLoading, setBoardGamesLoading] = useState(true)
+  const [booksLoading, setBooksLoading] = useState(true)
   const [error, setError] = useState('')
   const [boardGamesError, setBoardGamesError] = useState('')
+  const [booksError, setBooksError] = useState('')
   const [activeTab, setActiveTab] = useState<LibraryTab>('movies')
   const [search, setSearch] = useState('')
   const [boardGameSearch, setBoardGameSearch] = useState('')
+  const [bookSearch, setBookSearch] = useState('')
+  const [scope, setScope] = useState<LibraryScope>('all')
+  const [yearFrom, setYearFrom] = useState('')
+  const [yearTo, setYearTo] = useState('')
+  const [sort, setSort] = useState<LibrarySort>('date_added')
   const [editingMovie, setEditingMovie] = useState<LibraryMovie['movie'] | null>(null)
   const [savingMovie, setSavingMovie] = useState(false)
   const [editError, setEditError] = useState('')
   const [editingBoardGame, setEditingBoardGame] = useState<BoardGameRecord | null>(null)
   const [savingBoardGame, setSavingBoardGame] = useState(false)
   const [boardGameEditError, setBoardGameEditError] = useState('')
+  const [editingBook, setEditingBook] = useState<BookRecord | null>(null)
+  const [bookEditError, setBookEditError] = useState('')
+  const [savingBook, setSavingBook] = useState(false)
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const isAdmin = profile?.is_admin === true
   const isSuperuser = profile?.is_superuser === true
+  const libraryQuery = useMemo(() => {
+    const params = new URLSearchParams({ scope, sort })
+    if (isValidYear(yearFrom)) params.set('year_from', yearFrom)
+    if (isValidYear(yearTo)) params.set('year_to', yearTo)
+    return params.toString()
+  }, [scope, sort, yearFrom, yearTo])
   const visibleMovies = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
-    if (!query) return movies
-    return movies.filter(({ movie }) =>
+    return !query ? movies : movies.filter(({ movie }) =>
       localizedMovieTitle(movie, language).toLocaleLowerCase().includes(query)
       || movie.title.toLocaleLowerCase().includes(query)
       || movie.original_title.toLocaleLowerCase().includes(query),
@@ -59,13 +125,20 @@ export function LibraryPage() {
   }, [language, movies, search])
   const visibleBoardGames = useMemo(() => {
     const query = boardGameSearch.trim().toLocaleLowerCase()
-    if (!query) return boardGames
-    return boardGames.filter(({ board_game: game }) =>
+    return !query ? boardGames : boardGames.filter(({ board_game: game }) =>
       localizedBoardGameTitle(game, language).toLocaleLowerCase().includes(query)
       || game.title.toLocaleLowerCase().includes(query)
       || (game.description ?? '').toLocaleLowerCase().includes(query),
     )
   }, [boardGameSearch, boardGames, language])
+  const visibleBooks = useMemo(() => {
+    const query = bookSearch.trim().toLocaleLowerCase()
+    return !query ? books : books.filter(({ book }) =>
+      localizedBookTitle(book, language).toLocaleLowerCase().includes(query)
+      || book.title.toLocaleLowerCase().includes(query)
+      || book.authors.some((author) => author.toLocaleLowerCase().includes(query)),
+    )
+  }, [bookSearch, books, language])
 
   const libraryTabs = [
     { id: 'movies', label: t('libraryMovies'), Icon: Film },
@@ -174,6 +247,42 @@ export function LibraryPage() {
     }
   }
 
+  async function saveBook(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editingBook || !accessToken || !isAdmin) return
+    const form = new FormData(event.currentTarget)
+    const title = String(form.get('title') ?? '').trim()
+    if (!title) {
+      setBookEditError(t('bookTitleRequired'))
+      return
+    }
+    setSavingBook(true)
+    setBookEditError('')
+    try {
+      const response = await fetch(`/api/books/${editingBook.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: String(form.get('description') ?? '').trim() || null,
+          translations: [{
+            locale: 'uk-UA',
+            title: String(form.get('ukrainian_title') ?? '').trim() || null,
+            description: String(form.get('ukrainian_description') ?? '').trim() || null,
+          }],
+        }),
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('bookUpdateError')))
+      const updated = await response.json() as BookRecord
+      setBooks((current) => current.map((entry) => entry.book.id === updated.id ? { ...entry, book: updated } : entry))
+      setEditingBook(null)
+    } catch (saveError: unknown) {
+      setBookEditError(saveError instanceof Error ? saveError.message : t('bookUpdateError'))
+    } finally {
+      setSavingBook(false)
+    }
+  }
+
   useEffect(() => {
     if (!accessToken) return
     let cancelled = false
@@ -181,7 +290,7 @@ export function LibraryPage() {
     setLoading(true)
     // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
     setError('')
-    void fetch('/api/movies/library', { headers: { Authorization: `Bearer ${accessToken}` } })
+    void fetch(`/api/movies/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
         return response.json() as Promise<LibraryMovie[]>
@@ -192,7 +301,27 @@ export function LibraryPage() {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [accessToken, t])
+  }, [accessToken, libraryQuery, t])
+
+  useEffect(() => {
+    if (!accessToken) return
+    let cancelled = false
+    // oxlint-disable-next-line react/set-state-in-effect -- Loading state follows the library request.
+    setBooksLoading(true)
+    // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
+    setBooksError('')
+    void fetch(`/api/books/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
+        return response.json() as Promise<LibraryBook[]>
+      })
+      .then((result) => { if (!cancelled) setBooks(result) })
+      .catch((loadError: unknown) => {
+        if (!cancelled) setBooksError(loadError instanceof Error ? loadError.message : t('libraryLoadError'))
+      })
+      .finally(() => { if (!cancelled) setBooksLoading(false) })
+    return () => { cancelled = true }
+  }, [accessToken, libraryQuery, t])
 
   useEffect(() => {
     if (!accessToken) return
@@ -201,7 +330,7 @@ export function LibraryPage() {
     setBoardGamesLoading(true)
     // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
     setBoardGamesError('')
-    void fetch('/api/board-games/library', { headers: { Authorization: `Bearer ${accessToken}` } })
+    void fetch(`/api/board-games/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
         return response.json() as Promise<LibraryBoardGame[]>
@@ -212,7 +341,7 @@ export function LibraryPage() {
       })
       .finally(() => { if (!cancelled) setBoardGamesLoading(false) })
     return () => { cancelled = true }
-  }, [accessToken, t])
+  }, [accessToken, libraryQuery, t])
 
   return (
     <section className="library-page" aria-labelledby="library-title">
@@ -242,12 +371,13 @@ export function LibraryPage() {
       </div>
 
       <section hidden={activeTab !== 'movies'} className="library-section" id="library-panel-movies" role="tabpanel" aria-labelledby="library-tab-movies" tabIndex={0}>
+        <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
         <label className="library-search">
           <span className="visually-hidden">{t('librarySearchPlaceholder')}</span>
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('librarySearchPlaceholder')} />
         </label>
         {error && <p className="library-error" role="alert">{error}</p>}
-        {loading ? <p role="status">{t('loading')}</p> : movies.length === 0 ? <p className="library-empty">{isAdmin ? t('libraryAdminNoMovies') : t('libraryNoMovies')}</p> : visibleMovies.length === 0 ? <p className="library-empty">{t('librarySearchEmpty')}</p> : (
+        {loading ? <p role="status">{t('loading')}</p> : movies.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('librarySearchEmpty') : t('libraryNoMovies')}</p> : visibleMovies.length === 0 ? <p className="library-empty">{t('librarySearchEmpty')}</p> : (
           <div className="library-movie-grid">
             {visibleMovies.map(({ movie, clubs }) => (
               <article className="library-movie-card" key={movie.id}>
@@ -265,6 +395,7 @@ export function LibraryPage() {
                     <span>{t('libraryClubsLabel')}</span>
                     {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
                   </div>
+                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'movies', itemId: movie.id, title: localizedMovieTitle(movie, language) })}>{t('reviews')}</button>
                 </div>
               </article>
             ))}
@@ -302,19 +433,75 @@ export function LibraryPage() {
         </div>
       )}
 
-      <section hidden={activeTab !== 'books'} className="library-section library-placeholder-section" id="library-panel-books" role="tabpanel" aria-labelledby="library-tab-books" tabIndex={0}>
+      <section hidden={activeTab !== 'books'} className="library-section" id="library-panel-books" role="tabpanel" aria-labelledby="library-tab-books" tabIndex={0}>
         <h2>{t('libraryBooks')}</h2>
-        <p>{t('libraryBooksPlaceholder')}</p>
+        <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
+        <label className="library-search">
+          <span className="visually-hidden">{t('libraryBookSearchPlaceholder')}</span>
+          <input type="search" value={bookSearch} onChange={(event) => setBookSearch(event.target.value)} placeholder={t('libraryBookSearchPlaceholder')} />
+        </label>
+        {booksError && <p className="library-error" role="alert">{booksError}</p>}
+        {booksLoading ? <p role="status">{t('loading')}</p> : books.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('libraryBookSearchEmpty') : t('libraryNoBooks')}</p> : visibleBooks.length === 0 ? <p className="library-empty">{t('libraryBookSearchEmpty')}</p> : (
+          <div className="library-movie-grid">
+            {visibleBooks.map(({ book, clubs }) => (
+              <article className="library-movie-card" key={book.id}>
+                <button className="library-movie-card-trigger" type="button" onClick={() => { setEditingBook(book); setBookEditError('') }} aria-label={`${isAdmin ? t('editBook') : t('bookDetails')}: ${localizedBookTitle(book, language)}`}>
+                  {book.cover_image_url ? <img src={book.cover_image_url} alt="" /> : <div className="library-movie-placeholder" aria-hidden="true"><BookOpen size={25} /></div>}
+                  <div className="library-movie-details">
+                    <h3>{localizedBookTitle(book, language)}</h3>
+                    {book.authors.length > 0 && <p>{book.authors.join(', ')}</p>}
+                    {book.published_date && <p>{book.published_date}</p>}
+                  </div>
+                </button>
+                <div className="library-movie-details library-movie-club-details">
+                  <div className="library-clubs">
+                    <span>{t('libraryClubsLabel')}</span>
+                    {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
+                  </div>
+                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'books', itemId: book.id, title: localizedBookTitle(book, language) })}>{t('reviews')}</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
+
+      {editingBook && (
+        <div className="library-editor-backdrop" onClick={() => setEditingBook(null)}>
+          <section className="library-editor" role="dialog" aria-modal="true" aria-labelledby="library-book-editor-title" onClick={(event) => event.stopPropagation()}>
+            <h2 id="library-book-editor-title">{isAdmin ? t('editBook') : t('bookDetails')}</h2>
+            {isAdmin ? <form onSubmit={(event) => { void saveBook(event) }}>
+              <label>{t('bookTitle')}<input name="title" required maxLength={500} defaultValue={editingBook.title} /></label>
+              <label>{t('bookDescription')}<textarea name="description" defaultValue={editingBook.description ?? ''} /></label>
+              <label>{t('ukrainianTitle')}<input name="ukrainian_title" maxLength={500} defaultValue={editingBook.translations?.find((translation) => translation.locale === 'uk-UA')?.title ?? ''} /></label>
+              <label>{t('ukrainianDescription')}<textarea name="ukrainian_description" defaultValue={editingBook.translations?.find((translation) => translation.locale === 'uk-UA')?.description ?? ''} /></label>
+              {bookEditError && <p className="library-error" role="alert">{bookEditError}</p>}
+              <div className="library-editor-actions">
+                <button className="button button-light" type="button" disabled={savingBook} onClick={() => setEditingBook(null)}>{t('cancel')}</button>
+                <button className="button button-primary" type="submit" disabled={savingBook}>{savingBook ? t('saving') : t('save')}</button>
+              </div>
+            </form> : <div className="library-movie-readonly">
+              {editingBook.cover_image_url && <img src={editingBook.cover_image_url} alt="" />}
+              <h3>{localizedBookTitle(editingBook, language)}</h3>
+              {editingBook.authors.length > 0 && <p><strong>{t('bookAuthors')}:</strong> {editingBook.authors.join(', ')}</p>}
+              {editingBook.published_date && <p><strong>{t('bookPublished')}:</strong> {editingBook.published_date}</p>}
+              {localizedBookDescription(editingBook, language) && <p>{localizedBookDescription(editingBook, language)}</p>}
+              {editingBook.info_url && <p><a href={editingBook.info_url} target="_blank" rel="noreferrer">{t('bookGoogleBooksLink')}</a></p>}
+              <button className="button button-primary" type="button" onClick={() => setEditingBook(null)}>{t('cancel')}</button>
+            </div>}
+          </section>
+        </div>
+      )}
 
       <section hidden={activeTab !== 'board-games'} className="library-section" id="library-panel-board-games" role="tabpanel" aria-labelledby="library-tab-board-games" tabIndex={0}>
         <h2>{t('libraryBoardGames')}</h2>
+        <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
         <label className="library-search">
           <span className="visually-hidden">{t('libraryBoardGameSearchPlaceholder')}</span>
           <input type="search" value={boardGameSearch} onChange={(event) => setBoardGameSearch(event.target.value)} placeholder={t('libraryBoardGameSearchPlaceholder')} />
         </label>
         {boardGamesError && <p className="library-error" role="alert">{boardGamesError}</p>}
-        {boardGamesLoading ? <p role="status">{t('loading')}</p> : boardGames.length === 0 ? <p className="library-empty">{t('libraryNoBoardGames')}</p> : visibleBoardGames.length === 0 ? <p className="library-empty">{t('libraryBoardGameSearchEmpty')}</p> : (
+        {boardGamesLoading ? <p role="status">{t('loading')}</p> : boardGames.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('libraryBoardGameSearchEmpty') : t('libraryNoBoardGames')}</p> : visibleBoardGames.length === 0 ? <p className="library-empty">{t('libraryBoardGameSearchEmpty')}</p> : (
           <div className="library-movie-grid">
             {visibleBoardGames.map(({ board_game: game, clubs }) => (
               <article className="library-movie-card library-board-game-card" key={game.id}>
@@ -339,6 +526,7 @@ export function LibraryPage() {
                     <span>{t('libraryClubsLabel')}</span>
                     {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
                   </div>
+                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'board-games', itemId: game.id, title: localizedBoardGameTitle(game, language) })}>{t('reviews')}</button>
                 </div>
               </article>
             ))}
@@ -367,6 +555,7 @@ export function LibraryPage() {
           </section>
         </div>
       )}
+      {reviewTarget && accessToken && <ReviewPanel {...reviewTarget} accessToken={accessToken} onClose={() => setReviewTarget(null)} />}
     </section>
   )
 }

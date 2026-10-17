@@ -6,6 +6,11 @@
 .library-tab:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .library-section { display: grid; gap: 16px; }
 .library-section[hidden] { display: none; }
+.library-filters { width: min(100%, 760px); padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
+.library-filters summary { color: var(--link); font-weight: 600; cursor: pointer; }
+.library-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; padding-top: 13px; }
+.library-filter-grid label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.library-filter-grid input, .library-filter-grid select { width: 100%; min-height: 38px; padding: 8px 9px; border: 1px solid var(--border); border-radius: 7px; color: inherit; background: var(--surface); }
 .library-section > h2 { display: flex; align-items: center; gap: 9px; }
 .library-search { display: block; max-width: 520px; }
 .library-search input { width: 100%; min-height: 42px; padding: 10px 13px; border: 1px solid var(--border); border-radius: 8px; color: inherit; background: var(--surface); }
@@ -28,6 +33,7 @@
 .library-clubs { display: flex; flex-wrap: wrap; gap: 5px 10px; padding-top: 5px; color: var(--muted); font-size: 12px; }
 .library-clubs > span { width: 100%; }
 .library-clubs a { color: var(--link); }
+.library-review-button { justify-self: start; min-height: 32px; padding: 5px 10px; font-size: 12px; }
 .library-empty, .library-placeholder-section > p { color: var(--muted); }
 .library-placeholder-section { padding: 20px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface); }
 .library-error { color: var(--error); }
@@ -44,5 +50,19 @@
 .library-movie-readonly h3 { font: 600 20px/1.3 var(--serif); }
 .library-movie-readonly p { color: var(--muted); line-height: 1.55; }
 .library-editor-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
+.review-panel { display: grid; gap: 14px; }
+.review-panel h2 { overflow-wrap: anywhere; }
+.review-average { margin: -8px 0 0; color: var(--muted); }
+.review-list { display: grid; gap: 9px; max-height: 230px; overflow-y: auto; }
+.review-list > p { margin: 0; color: var(--muted); }
+.review-entry { display: grid; gap: 7px; padding: 11px; border: 1px solid var(--border); border-radius: 8px; }
+.review-entry header { display: flex; justify-content: space-between; gap: 12px; }
+.review-entry p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-entry small, .review-privacy-help { color: var(--muted); }
+.review-form { border-top: 1px solid var(--border); padding-top: 14px; }
+.library-editor .review-form select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 7px; color: inherit; background: var(--surface); }
+.library-editor .review-form .review-public-toggle { display: flex; align-items: center; gap: 8px; }
+.library-editor .review-form .review-public-toggle input { width: auto; }
+.review-privacy-help { margin: -7px 0 0; font-size: 12px; }
 @media (max-width: 600px) { .library-movie-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); } .library-editor { padding: 18px; } }
 .library-page .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

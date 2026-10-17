@@ -35,7 +35,7 @@ Cancelled and held events remain available to club members as history. A delayed
 - Events spanning multiple days are supported. The club's time zone should be used to interpret/display event times; the time-zone source needs confirmation.
 - Movie club entries represent the watch queue or a planned watch and must link to a saved movie. Their start date is optional, and they do not have an end date or time. An entry without a start date appears in the queue. If a movie club entry is created with a start date before the current date, it is created with `held` status.
 - Board game club events link to a saved board game, use its title and cover image, and have an optional start date without an end date or times. A manager can select an existing game or create one while creating the event.
-- Book and sport club events continue to require start and end dates.
+- Book club events link to a saved book and use its title and cover image. They support an optional start date only, without an end date or times; entries without a start date appear in the queue, and entries with a past start date are created as held. Sport club events require start and end dates and may include a start and end time.
 - Delaying an event should not silently overwrite its original schedule. Whether the system keeps both original and revised scheduling details is an open question.
 
 ## Catalog item association
@@ -68,10 +68,10 @@ Cancelled and held events remain available to club members as history. A delayed
 | `title` | Optional user-provided title; for board game events it is derived from the linked game |
 | `linked_item_id` | Optional reference to an associated catalog item; required for board game club events |
 | `avatar_url` | Optional image URL; for movie and board game entries it is derived from the linked catalog item's cover |
-| `start_date` | Required for book and sport events; optional for movie queue entries and board game events |
-| `end_date` | Required for book and sport events, on or after `start_date`; null for movie and board game entries |
-| `start_time` | Optional for book and sport events; null for all-day events and movie/board game entries |
-| `end_time` | Optional for book and sport events; must be supplied with `start_time`; null for movie/board game entries |
+| `start_date` | Required for sport events; optional for movie, book, and board game entries |
+| `end_date` | Required for sport events, on or after `start_date`; null for movie, book, and board game entries |
+| `start_time` | Optional for sport events; null for book, movie, and board game entries |
+| `end_time` | Optional for sport events; must be supplied with `start_time`; null for book, movie, and board game entries |
 | `status` | `scheduled`, `delayed`, `cancelled`, `held`, or `deleted` |
 | `created_by` | Profile that created the event |
 | `created_at`, `updated_at` | Creation and last-update timestamps |
@@ -85,6 +85,7 @@ If delayed-event schedule history is required, store the prior and revised sched
 - Create an event for a club.
 - Open the creation form from a Create event button. Show upcoming events, the movie queue where applicable, and held events in separate sections.
 - For movie clubs, allow creation with no start date to add an item to the queue; create entries with a past start date as held.
+- For book clubs, let managers select a saved book and create a queue entry without a date or a dated entry with a single start date.
 - For board game clubs, let managers select an existing game or create a catalog game by title, then create an event with the game's title and cover and an optional single start date.
 - List and view events for a club, subject to club membership and visibility.
 - Represent all-day and timed events, including events spanning more than one date.
@@ -96,8 +97,8 @@ If delayed-event schedule history is required, store the prior and revised sched
 
 ## Acceptance criteria
 
-1. Every event belongs to exactly one club. Book and sport events require start and end dates with the end on or after the start; movie and board game entries have an optional start date and no end date.
-2. An event with no times is treated as all-day; a timed event has both a start and end time.
+1. Every event belongs to exactly one club. Sport events require start and end dates with the end on or after the start; movie, book, and board game entries have an optional start date and no end date.
+2. Book club events are date-only. Sport events may have times; when provided, both start and end times are required.
 3. A catalog item association is optional. When it exists and no custom title is set, the linked item's title is shown as the event title.
 4. An event with neither custom title nor linked item can still be created and shown with a neutral fallback label.
 5. Club members can see events for their club; non-members cannot see private-club events through lists or direct event access.
@@ -105,7 +106,7 @@ If delayed-event schedule history is required, store the prior and revised sched
 7. Cancelled and held events remain accessible in the club's event history.
 8. A deleted event has `status = deleted`, a deletion timestamp, and the profile that deleted it; normal event listings do not return it.
 9. The generic item reference can support additional catalog item kinds without renaming the event field. An associated item's image may be shown as the event avatar.
-10. Event creation begins from a button, and event lists are separated into upcoming, queue (movie clubs), and held sections. Movie and board game entries created with a past start date have `held` status.
+10. Event creation begins from a button, and event lists are separated into upcoming, queue (movie and book clubs), and held sections. Movie, book, and board game entries created with a past start date have `held` status.
 
 ## Open questions
 

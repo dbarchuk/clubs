@@ -1,6 +1,7 @@
-from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, Integer, Select, String, Text, func, select
+from sqlalchemy.orm import Mapped, mapped_column, query_expression, relationship, with_expression
 
+from app.backend.reviews.models import BoardGameReview
 from app.core.database import Base
 from app.core.models import OwnedModelMixin
 
@@ -15,9 +16,26 @@ class BoardGame(OwnedModelMixin, Base):
     min_players: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_players: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    average_rating: Mapped[float | None] = query_expression()
     translations: Mapped[list["BoardGameTranslation"]] = relationship(
         back_populates="board_game", cascade="all, delete-orphan", passive_deletes=True
     )
+    reviews: Mapped[list[BoardGameReview]] = relationship(
+        back_populates="board_game", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @classmethod
+    def with_average_rating(cls, statement: Select) -> Select:
+        average_rating = (
+            select(func.avg(BoardGameReview.rating))
+            .where(
+                BoardGameReview.board_game_id == cls.id,
+                BoardGameReview.is_public.is_(True),
+            )
+            .correlate_except(BoardGameReview)
+            .scalar_subquery()
+        )
+        return statement.options(with_expression(cls.average_rating, average_rating))
 
 
 class BoardGameTranslation(Base):

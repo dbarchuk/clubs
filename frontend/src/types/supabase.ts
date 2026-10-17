@@ -53,6 +53,7 @@ export interface EventRecord {
   linked_item_id: string | null
   linked_movie: MovieRecord | null
   linked_board_game: BoardGameRecord | null
+  linked_book: BookRecord | null
   avatar_url: string | null
   start_date: string | null
   end_date: string | null
@@ -103,6 +104,69 @@ export interface LibraryMovie {
 export interface LibraryBoardGame {
   board_game: BoardGameRecord
   clubs: Array<{ id: string; title: string }>
+}
+
+export interface BookTranslation {
+  locale: string
+  title: string | null
+  description: string | null
+}
+
+export interface BookRecord {
+  id: number
+  provider: string
+  external_id: string
+  title: string
+  subtitle: string | null
+  authors: string[]
+  publisher: string | null
+  published_date: string | null
+  description: string | null
+  isbn_10: string | null
+  isbn_13: string | null
+  page_count: number | null
+  categories: string[]
+  language: string | null
+  cover_image_url: string | null
+  info_url: string | null
+  provider_average_rating: number | null
+  provider_ratings_count: number | null
+  average_rating: number | null
+  translations: BookTranslation[]
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BookProviderResult extends Omit<BookRecord, 'id' | 'created_by' | 'created_at' | 'updated_at'> {
+  id: null
+}
+
+export type BookSearchResult = BookRecord | BookProviderResult
+
+export interface LibraryBook {
+  book: BookRecord
+  clubs: Array<{ id: string; title: string }>
+}
+
+export type ReviewCatalogType = 'books' | 'movies' | 'board-games'
+
+export interface ReviewRecord {
+  id: number
+  item_id: number
+  reviewer_id: string
+  reviewer_name: string
+  rating: number | null
+  body: string | null
+  is_public: boolean
+  is_mine: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ReviewList {
+  reviews: ReviewRecord[]
+  average_rating: number | null
 }
 
 export interface BoardGameRecord {

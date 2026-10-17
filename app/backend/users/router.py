@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
@@ -19,8 +20,10 @@ from app.backend.users.schemas import (
 )
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import log_external_error
 
 router = APIRouter(prefix="/users", tags=["users"])
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -92,6 +95,7 @@ async def get_current_user(
             response.raise_for_status()
         jwks = response.json()
     except (httpx.HTTPError, ValueError) as exc:
+        log_external_error(logger, "Supabase JWKS retrieval failed", exc)
         raise HTTPException(status_code=503, detail="Unable to verify token") from exc
 
     signing_key = next(
@@ -293,6 +297,14 @@ async def list_users(
                     return users
                 page += 1
     except (httpx.HTTPError, ValueError) as exc:
+        log_external_error(
+            logger,
+            "Supabase user listing request failed",
+            exc,
+            secrets=(settings.supabase_secret_key.get_secret_value(),)
+            if settings.supabase_secret_key
+            else (),
+        )
         raise HTTPException(status_code=502, detail="Unable to retrieve Supabase users") from exc
 
 

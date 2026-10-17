@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.backend.board_games.models import BoardGame
 from app.backend.board_games.schemas import BoardGameResponse
+from app.backend.books.models import Book
+from app.backend.books.schemas import BookResponse
 from app.backend.clubs.models import Club, ClubType
 from app.backend.clubs.permissions import require_manager, require_member
 from app.backend.events.models import Event, EventStatus
@@ -34,7 +36,7 @@ def active_event(db: Session, event_id: str) -> Event:
 
 
 def validate_schedule(event: Event, club: Club) -> None:
-    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES}:
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK}:
         return
     if event.start_date is None or event.end_date is None:
         raise HTTPException(status_code=422, detail="Start and end dates are required")
@@ -75,6 +77,15 @@ def get_linked_board_game(
     return game
 
 
+def get_linked_book(db: Session, club: Club, linked_item_id: str | None) -> Book | None:
+    if club.club_type != ClubType.BOOK or linked_item_id is None:
+        return None
+    book = db.get(Book, int(linked_item_id)) if linked_item_id.isdecimal() else None
+    if book is None:
+        raise HTTPException(status_code=422, detail="Select a book from the book catalog")
+    return book
+
+
 def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
     response = EventResponse.model_validate(event)
     linked_movie = None
@@ -89,8 +100,18 @@ def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
             board_game = db.get(BoardGame, int(event.linked_item_id))
             if board_game is not None:
                 linked_board_game = BoardGameResponse.model_validate(board_game)
+    linked_book = None
+    if club.club_type == ClubType.BOOK and event.linked_item_id is not None:
+        if event.linked_item_id.isdecimal():
+            book = db.get(Book, int(event.linked_item_id))
+            if book is not None:
+                linked_book = BookResponse.model_validate(book)
     return response.model_copy(
-        update={"linked_movie": linked_movie, "linked_board_game": linked_board_game}
+        update={
+            "linked_movie": linked_movie,
+            "linked_board_game": linked_board_game,
+            "linked_book": linked_book,
+        }
     )
 
 
@@ -129,37 +150,40 @@ async def create_club_event(
         raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
     movie = validate_movie_link(db, club, payload.linked_item_id)
     board_game = get_linked_board_game(db, club, payload.linked_item_id)
-    if club.club_type not in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
+    book = get_linked_book(db, club, payload.linked_item_id)
+    if club.club_type not in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} and (
         payload.start_date is None or payload.end_date is None
     ):
         raise HTTPException(status_code=422, detail="Start and end dates are required")
-    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES} and (
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} and (
         payload.end_date is not None
         or payload.start_time is not None
         or payload.end_time is not None
     ):
         raise HTTPException(
             status_code=422,
-            detail="Movie and board game club entries only support an optional start date",
+            detail="Movie, book, and board game entries only support an optional start date",
         )
     event = Event(
         club_id=club_id,
-        title=board_game.title if board_game is not None else payload.title,
+        title=(board_game.title if board_game is not None else book.title if book is not None and payload.title is None else payload.title),
         linked_item_id=payload.linked_item_id,
         avatar_url=(
             board_game.cover_image_url
             if board_game is not None
+            else book.cover_image_url
+            if book is not None
             else movie.cover_image_url
             if movie is not None
             else str(payload.avatar_url) if payload.avatar_url else None
         ),
         start_date=payload.start_date,
-        end_date=None if board_game is not None else payload.end_date,
-        start_time=None if board_game is not None else payload.start_time,
-        end_time=None if board_game is not None else payload.end_time,
+        end_date=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.end_date,
+        start_time=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.start_time,
+        end_time=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.end_time,
         status=(
             EventStatus.HELD
-            if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES}
+            if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK}
             and payload.start_date is not None
             and payload.start_date < datetime.now(UTC).date()
             else EventStatus.SCHEDULED
@@ -188,12 +212,13 @@ async def update_event(
     for field, value in changes.items():
         setattr(event, field, value)
     board_game = get_linked_board_game(db, club, event.linked_item_id)
-    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES} and any(
+    book = get_linked_book(db, club, event.linked_item_id)
+    if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} and any(
         field in changes for field in ("start_date", "end_date", "start_time", "end_time")
     ) and (event.end_date is not None or event.start_time is not None or event.end_time is not None):
         raise HTTPException(
             status_code=422,
-            detail="Movie and board game club entries only support an optional start date",
+            detail="Movie, book, and board game entries only support an optional start date",
         )
     if board_game is not None:
         event.title = board_game.title
@@ -201,6 +226,11 @@ async def update_event(
         event.end_date = None
         event.start_time = None
         event.end_time = None
+    if book is not None:
+        if event.title is None:
+            event.title = book.title
+        if "avatar_url" not in payload.model_fields_set:
+            event.avatar_url = book.cover_image_url
     validate_schedule(event, club)
     movie = validate_movie_link(db, club, event.linked_item_id)
     if movie is not None:

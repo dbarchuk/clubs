@@ -1,10 +1,11 @@
-from typing import Annotated
+import logging
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.backend.board_games.models import BoardGame, BoardGameTranslation
 from app.backend.board_games.clients import GeekachBoardGameClient
@@ -16,14 +17,17 @@ from app.backend.board_games.schemas import (
     BoardGameUpdate,
     LibraryBoardGameResponse,
 )
+from app.backend.library import my_club_item_ids
 from app.backend.clubs.models import Club, ClubMember, ClubType
 from app.backend.events.models import Event, EventStatus
 from app.backend.users.models import Profile
 from app.backend.users.router import get_active_profile, is_superuser_email
 from app.core.database import get_db
+from app.core.logging import log_external_error
 
 router = APIRouter(prefix="/board-games", tags=["board-games"])
 geekach_client = GeekachBoardGameClient()
+logger = logging.getLogger(__name__)
 
 
 @router.get("", response_model=list[BoardGameResponse | BoardGameProviderResult])
@@ -52,6 +56,7 @@ async def search_board_games(
     try:
         provider_results = await geekach_client.search(normalized_title)
     except (httpx.HTTPError, ValueError) as exc:
+        log_external_error(logger, "Geekach board game search failed", exc)
         # Keep local catalog search usable while the external shop is unavailable.
         if not local_results:
             raise HTTPException(
@@ -66,10 +71,42 @@ async def search_board_games(
 async def list_library_board_games(
     profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
+    scope: Literal["all", "mine"] = "all",
+    year_from: Annotated[int | None, Query(ge=1000, le=2200)] = None,
+    year_to: Annotated[int | None, Query(ge=1000, le=2200)] = None,
+    sort: Literal["date_added", "year_released"] = "date_added",
 ) -> list[LibraryBoardGameResponse]:
+    if year_from is not None and year_to is not None and year_from > year_to:
+        raise HTTPException(status_code=422, detail="year_from must be on or before year_to")
+    query = select(BoardGame).options(selectinload(BoardGame.translations))
+    if scope == "mine":
+        query = query.where(
+            cast(BoardGame.id, String).in_(
+                my_club_item_ids(ClubType.BOARD_GAMES, profile.id)
+            )
+        )
+    if year_from is not None:
+        query = query.where(BoardGame.year_published >= year_from)
+    if year_to is not None:
+        query = query.where(BoardGame.year_published <= year_to)
+    query = query.order_by(
+        BoardGame.created_at.desc()
+        if sort == "date_added"
+        else BoardGame.year_published.desc().nulls_last(),
+        BoardGame.title,
+    )
+    games = db.scalars(query).all()
+    library = {
+        game.id: LibraryBoardGameResponse(
+            board_game=BoardGameResponse.model_validate(game),
+            clubs=[],
+        )
+        for game in games
+    }
     rows = db.execute(
-        select(BoardGame, Club)
-        .join(Event, Event.linked_item_id == cast(BoardGame.id, String))
+        select(BoardGame.id, Club)
+        .select_from(Event)
+        .join(BoardGame, Event.linked_item_id == cast(BoardGame.id, String))
         .join(Club, Club.id == Event.club_id)
         .join(ClubMember, ClubMember.club_id == Club.id)
         .where(
@@ -79,19 +116,11 @@ async def list_library_board_games(
             Event.deleted_at.is_(None),
             Event.status != EventStatus.DELETED,
         )
-        .order_by(BoardGame.title, BoardGame.year_published, Club.title)
+        .order_by(Club.title)
     ).all()
-
-    library: dict[int, LibraryBoardGameResponse] = {}
-    for game, club in rows:
-        entry = library.get(game.id)
-        if entry is None:
-            entry = LibraryBoardGameResponse(
-                board_game=BoardGameResponse.model_validate(game),
-                clubs=[],
-            )
-            library[game.id] = entry
-        if all(reference.id != club.id for reference in entry.clubs):
+    for game_id, club in rows:
+        entry = library.get(game_id)
+        if entry is not None and all(reference.id != club.id for reference in entry.clubs):
             entry.clubs.append(BoardGameClubReference(id=club.id, title=club.title))
     return list(library.values())
 

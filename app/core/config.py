@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     supabase_secret_key: SecretStr | None = None
     supabase_jwks_url: str | None = None
     tmdb_api_key: SecretStr | None = None
+    # Contains a Google Books API key (or OAuth access token), not an OAuth client secret.
+    google_books_api_secret: SecretStr | None = None
     superuser_emails: list[str] = Field(
         default_factory=lambda: ["dvbarchuk@gmail.com"]
     )

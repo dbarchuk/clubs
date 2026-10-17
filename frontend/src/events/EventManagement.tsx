@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
-import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedMovieTitle } from '../lib/catalog-localization'
-import type { BoardGameRecord, BoardGameSearchResult, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
+import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedBookTitle, localizedMovieTitle } from '../lib/catalog-localization'
+import type { BookRecord, BookSearchResult, BoardGameRecord, BoardGameSearchResult, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
 import './events.css'
 
 const DEFAULT_NOTICE_DURATION_MS = 5_000
@@ -58,6 +58,13 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [searchingBoardGames, setSearchingBoardGames] = useState(false)
   const [savingBoardGame, setSavingBoardGame] = useState(false)
   const [selectedBoardGame, setSelectedBoardGame] = useState<BoardGameRecord | null>(null)
+  const [bookQuery, setBookQuery] = useState('')
+  const [bookResults, setBookResults] = useState<BookSearchResult[]>([])
+  const [searchingBooks, setSearchingBooks] = useState(false)
+  const [savingBook, setSavingBook] = useState(false)
+  const [hasSearchedBooks, setHasSearchedBooks] = useState(false)
+  const [hasSearchedGoogleBooks, setHasSearchedGoogleBooks] = useState(false)
+  const [selectedBook, setSelectedBook] = useState<BookRecord | null>(null)
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null)
 
   const loadEvents = useCallback(async () => {
@@ -101,6 +108,11 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     setBoardGameUkrainianDescription('')
     setBoardGameResults([])
     setSelectedBoardGame(null)
+    setBookQuery('')
+    setBookResults([])
+    setHasSearchedBooks(false)
+    setHasSearchedGoogleBooks(false)
+    setSelectedBook(null)
   }
 
   const searchMovies = async (includeTmdb = false) => {
@@ -163,6 +175,72 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     if (event.key === 'Enter') {
       event.preventDefault()
       void searchBoardGames()
+    }
+  }
+
+  const searchBooks = async (includeGoogleBooks = false) => {
+    const query = bookQuery.trim()
+    if (!query) return
+    setSearchingBooks(true)
+    setError('')
+    if (!includeGoogleBooks) {
+      setBookResults([])
+      setHasSearchedBooks(false)
+      setHasSearchedGoogleBooks(false)
+    }
+    try {
+      const params = new URLSearchParams({
+        query,
+        search_provider: String(includeGoogleBooks),
+        language: catalogLocaleForQuery(query, language).startsWith('uk') ? 'uk' : 'en',
+      })
+      const response = await fetch(`/api/books?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('bookSearchError')))
+      setBookResults((await response.json()) as BookSearchResult[])
+      setHasSearchedBooks(true)
+      if (includeGoogleBooks) setHasSearchedGoogleBooks(true)
+    } catch (searchError: unknown) {
+      setError(searchError instanceof Error ? searchError.message : t('bookSearchError'))
+    } finally {
+      setSearchingBooks(false)
+    }
+  }
+
+  const handleBookSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      void searchBooks()
+    }
+  }
+
+  const selectBook = async (book: BookSearchResult) => {
+    if (book.id !== null) {
+      setSelectedBook(book)
+      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : localizedBookTitle(book, language))
+      setBookResults([])
+      return
+    }
+    setSavingBook(true)
+    setError('')
+    try {
+      const response = await fetch('/api/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ external_id: book.external_id }),
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('bookSaveError')))
+      const savedBook = await response.json() as BookRecord
+      setSelectedBook(savedBook)
+      setTitle((currentTitle) => currentTitle.trim() ? currentTitle : localizedBookTitle(savedBook, language))
+      setBookResults([])
+      setHasSearchedBooks(false)
+      setHasSearchedGoogleBooks(false)
+    } catch (saveError: unknown) {
+      setError(saveError instanceof Error ? saveError.message : t('bookSaveError'))
+    } finally {
+      setSavingBook(false)
     }
   }
 
@@ -270,6 +348,11 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     setSelectedBoardGame(record.linked_board_game)
     setBoardGameQuery(record.linked_board_game ? localizedBoardGameTitle(record.linked_board_game, language) : '')
     setBoardGameResults([])
+    setSelectedBook(record.linked_book)
+    setBookQuery(record.linked_book ? localizedBookTitle(record.linked_book, language) : '')
+    setBookResults([])
+    setHasSearchedBooks(false)
+    setHasSearchedGoogleBooks(false)
     setMovieResults([])
     setHasSearchedMovies(false)
     setHasSearchedTmdbMovies(false)
@@ -284,7 +367,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     setNotice('')
     const isMovieClub = clubType === 'movie'
     const isBoardGameClub = clubType === 'board_games'
-    const isCatalogEvent = isMovieClub || isBoardGameClub
+    const isBookClub = clubType === 'book'
+    const isCatalogEvent = isMovieClub || isBoardGameClub || isBookClub
     const url = editingEvent
       ? `/api/events/${editingEvent.id}`
       : `/api/events/clubs/${clubId}`
@@ -295,13 +379,13 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         body: JSON.stringify({
           title: isBoardGameClub
             ? (selectedBoardGame?.title ?? null)
-            : title.trim() || (isMovieClub && selectedMovie ? localizedMovieTitle(selectedMovie, language) : null) || null,
-          linked_item_id: isMovieClub ? (selectedMovie ? String(selectedMovie.id) : null) : isBoardGameClub ? (selectedBoardGame ? String(selectedBoardGame.id) : null) : (linkedItemId.trim() || null),
+            : title.trim() || (isMovieClub && selectedMovie ? localizedMovieTitle(selectedMovie, language) : null) || (isBookClub && selectedBook ? localizedBookTitle(selectedBook, language) : null) || null,
+          linked_item_id: isMovieClub ? (selectedMovie ? String(selectedMovie.id) : null) : isBoardGameClub ? (selectedBoardGame ? String(selectedBoardGame.id) : null) : isBookClub ? (selectedBook ? String(selectedBook.id) : null) : (linkedItemId.trim() || null),
           avatar_url: isCatalogEvent ? null : (avatarUrl.trim() || null),
           start_date: startDate || null,
           end_date: isCatalogEvent ? null : endDate || null,
-          start_time: isCatalogEvent ? null : startTime || null,
-          end_time: isCatalogEvent ? null : endTime || null,
+          start_time: isCatalogEvent || isBookClub ? null : startTime || null,
+          end_time: isCatalogEvent || isBookClub ? null : endTime || null,
         }),
       })
       if (!response.ok) throw new Error(await errorMessage(response, editingEvent ? t('eventUpdateError') : t('eventSaveError')))
@@ -344,23 +428,25 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     }
   }
 
-  const queueEvents = clubType === 'movie'
+  const queueEvents = clubType === 'movie' || clubType === 'book'
     ? events.filter((record) => record.status !== 'held' && record.start_date === null)
     : []
   const heldEvents = events.filter((record) => record.status === 'held')
   const upcomingEvents = events
     .filter((record) =>
       record.status !== 'held' && record.status !== 'cancelled'
-      && !(clubType === 'movie' && record.start_date === null),
+      && !((clubType === 'movie' || clubType === 'book') && record.start_date === null),
     )
     .sort((first, second) => (second.start_date ?? '').localeCompare(first.start_date ?? ''))
 
   const renderEvent = (record: EventRecord) => (
     clubType === 'movie' || clubType === 'board_games' ? renderCatalogEvent(record) : (
     <li className="event-card" key={record.id}>
-      {(record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || ''} alt="" />}
+      {(record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url || ''} alt="" />}
       <div className="event-card-content">
-        <h3>{record.title || record.linked_movie?.title || record.linked_board_game?.title || t('clubEvent')}</h3>
+        <h3>{record.linked_book && (!record.title || record.title === record.linked_book.title || record.linked_book.translations.some((translation) => translation.title === record.title))
+          ? localizedBookTitle(record.linked_book, language)
+          : record.title || record.linked_movie?.title || record.linked_board_game?.title || record.linked_book?.title || t('clubEvent')}</h3>
         <p>{record.start_date ? `${record.start_date}${record.end_date && record.end_date !== record.start_date ? ` – ${record.end_date}` : ''}${record.start_time ? ` · ${record.start_time.slice(0, 5)}–${record.end_time?.slice(0, 5) ?? ''}` : ` · ${t('allDay')}`}` : t('eventQueue')}</p>
         <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
       </div>
@@ -511,27 +597,50 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
                 </ul>
               )}
             </div>
+          ) : clubType === 'book' ? (
+            <div className="movie-picker">
+              <label className="club-form-field"><span>{t('searchBooks')}</span><input value={bookQuery} onChange={(event) => { setBookQuery(event.target.value); setSelectedBook(null); setBookResults([]); setHasSearchedBooks(false); setHasSearchedGoogleBooks(false) }} onKeyDown={handleBookSearchKeyDown} /></label>
+              <div className="event-form-actions movie-search-actions">
+                <button className="button button-light" type="button" onClick={() => void searchBooks()} disabled={searchingBooks || !bookQuery.trim()}>{searchingBooks ? t('loading') : t('search')}</button>
+                {hasSearchedBooks && !hasSearchedGoogleBooks && <button className="button button-primary" type="button" onClick={() => void searchBooks(true)} disabled={searchingBooks}>{searchingBooks ? t('loading') : t('searchGoogleBooks')}</button>}
+              </div>
+              {selectedBook && <div className="selected-movie">
+                {selectedBook.cover_image_url && <img src={selectedBook.cover_image_url} alt="" />}
+                <span>{localizedBookTitle(selectedBook, language)}{selectedBook.authors.length ? ` · ${selectedBook.authors.join(', ')}` : ''}</span>
+                <button className="button button-light" type="button" onClick={() => { setSelectedBook(null); setBookQuery('') }}>{t('removeSelectedBook')}</button>
+              </div>}
+              {savingBook && <p role="status">{t('savingBook')}</p>}
+              {bookResults.length > 0 && <ul className="movie-search-results" aria-label={t('bookSearchResults')}>
+                {bookResults.map((book) => <li key={book.id === null ? `${book.provider}-${book.external_id}` : `local-${book.id}`}>
+                  <button type="button" onClick={() => void selectBook(book)} disabled={savingBook}>
+                    {book.cover_image_url && <img src={book.cover_image_url} alt="" />}
+                    <span><strong>{localizedBookTitle(book, language)}</strong><small>{[book.authors.join(', '), book.published_date, book.id === null ? t('bookFromGoogleBooks') : t('bookAlreadySaved')].filter(Boolean).join(' · ')}</small></span>
+                  </button>
+                </li>)}
+              </ul>}
+              {!searchingBooks && hasSearchedBooks && bookResults.length === 0 && <p>{t('noBookResults')}</p>}
+            </div>
           ) : (
             <label className="club-form-field"><span>{t('linkedItemId')}</span><input value={linkedItemId} onChange={(event) => setLinkedItemId(event.target.value)} /></label>
           )}
-          {clubType !== 'movie' && clubType !== 'board_games' && <label className="club-form-field"><span>{t('eventAvatarUrl')}</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} /></label>}
+          {clubType !== 'movie' && clubType !== 'board_games' && clubType !== 'book' && <label className="club-form-field"><span>{t('eventAvatarUrl')}</span><input type="url" value={avatarUrl} onChange={(event) => setAvatarUrl(event.target.value)} /></label>}
           <div className="event-date-fields">
-            <label className="club-form-field"><span>{t('startDate')}{clubType === 'movie' || clubType === 'board_games' ? ` (${t('optional')})` : ''}</span><input required={clubType !== 'movie' && clubType !== 'board_games'} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
-            {clubType !== 'movie' && clubType !== 'board_games' && <>
+            <label className="club-form-field"><span>{t('startDate')}{clubType === 'movie' || clubType === 'board_games' || clubType === 'book' ? ` (${t('optional')})` : ''}</span><input required={clubType !== 'movie' && clubType !== 'board_games' && clubType !== 'book'} type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} /></label>
+            {clubType !== 'movie' && clubType !== 'board_games' && clubType !== 'book' && <>
               <label className="club-form-field"><span>{t('endDate')}</span><input required type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} /></label>
               <label className="club-form-field"><span>{t('startTime')}</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
               <label className="club-form-field"><span>{t('endTime')}</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
             </>}
           </div>
           <div className="event-form-actions">
-            <button className="button button-primary" type="submit" disabled={saving || savingMovie || savingBoardGame}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
+            <button className="button button-primary" type="submit" disabled={saving || savingMovie || savingBoardGame || savingBook}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
             {editingEvent && <button className="button button-light" type="button" onClick={resetForm}>{t('cancelEditEvent')}</button>}
           </div>
         </form>
       )}
       {loading ? <p role="status">{t('loading')}</p> : events.length === 0 ? <p>{t('noEvents')}</p> : <div className="event-groups">
         <section aria-labelledby="upcoming-events-title"><h3 id="upcoming-events-title">{t('upcomingEvents')}</h3>{upcomingEvents.length ? <ul className={eventListClassName}>{upcomingEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>
-        {clubType === 'movie' && <section aria-labelledby="event-queue-title"><h3 id="event-queue-title">{t('eventQueue')}</h3>{queueEvents.length ? <ul className={eventListClassName}>{queueEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>}
+        {(clubType === 'movie' || clubType === 'book') && <section aria-labelledby="event-queue-title"><h3 id="event-queue-title">{t('eventQueue')}</h3>{queueEvents.length ? <ul className={eventListClassName}>{queueEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>}
         <section aria-labelledby="held-events-title"><h3 id="held-events-title">{t('heldEvents')}</h3>{heldEvents.length ? <ul className={eventListClassName}>{heldEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>
       </div>}
     </section>
