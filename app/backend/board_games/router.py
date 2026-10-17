@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.backend.board_games.models import BoardGame, BoardGameTranslation
+from app.backend.reviews.models import BoardGameReview
 from app.backend.board_games.clients import GeekachBoardGameClient
 from app.backend.board_games.schemas import (
     BoardGameCreate,
@@ -96,10 +97,19 @@ async def list_library_board_games(
         BoardGame.title,
     )
     games = db.scalars(query).all()
+    ratings = dict(
+        db.execute(
+            select(BoardGameReview.board_game_id, BoardGameReview.rating).where(
+                BoardGameReview.reviewer_id == profile.id,
+                BoardGameReview.board_game_id.in_([game.id for game in games]),
+            )
+        ).all()
+    ) if games else {}
     library = {
         game.id: LibraryBoardGameResponse(
             board_game=BoardGameResponse.model_validate(game),
             clubs=[],
+            my_rating=ratings.get(game.id),
         )
         for game in games
     }

@@ -99,11 +99,13 @@ export interface MovieRecord extends MovieSearchResult {
 export interface LibraryMovie {
   movie: MovieRecord
   clubs: Array<{ id: string; title: string }>
+  my_rating: number | null
 }
 
 export interface LibraryBoardGame {
   board_game: BoardGameRecord
   clubs: Array<{ id: string; title: string }>
+  my_rating: number | null
 }
 
 export interface BookTranslation {
@@ -147,6 +149,7 @@ export type BookSearchResult = BookRecord | BookProviderResult
 export interface LibraryBook {
   book: BookRecord
   clubs: Array<{ id: string; title: string }>
+  my_rating: number | null
 }
 
 export type ReviewCatalogType = 'books' | 'movies' | 'board-games'

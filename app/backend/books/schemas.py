@@ -74,3 +74,4 @@ class BookClubReference(BaseModel):
 class LibraryBookResponse(BaseModel):
     book: BookResponse
     clubs: list[BookClubReference]
+    my_rating: int | None = None

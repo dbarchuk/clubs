@@ -105,3 +105,4 @@ class BoardGameClubReference(BaseModel):
 class LibraryBoardGameResponse(BaseModel):
     board_game: BoardGameResponse
     clubs: list[BoardGameClubReference]
+    my_rating: int | None = None

@@ -68,3 +68,4 @@ class LibraryClubReference(BaseModel):
 class LibraryMovieResponse(BaseModel):
     movie: MovieResponse
     clubs: list[LibraryClubReference]
+    my_rating: int | None = None

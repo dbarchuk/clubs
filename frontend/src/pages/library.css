@@ -33,7 +33,12 @@
 .library-clubs { display: flex; flex-wrap: wrap; gap: 5px 10px; padding-top: 5px; color: var(--muted); font-size: 12px; }
 .library-clubs > span { width: 100%; }
 .library-clubs a { color: var(--link); }
-.library-review-button { justify-self: start; min-height: 32px; padding: 5px 10px; font-size: 12px; }
+.library-my-rating { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 8px; width: 100%; padding: 0; border: 0; color: var(--muted); font: inherit; font-size: 11px; text-align: left; background: transparent; cursor: pointer; }
+.library-my-rating:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; border-radius: 3px; }
+.library-my-rating > strong { color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.library-my-rating-track { grid-column: 1 / -1; display: block; height: 7px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.library-my-rating-track > span { display: block; height: 100%; border-radius: inherit; background: var(--link); }
+.library-movie-card .library-review-button { justify-self: start; align-self: start; width: max-content; max-width: 100%; margin-left: 0; margin-right: auto; justify-content: flex-start; text-align: left; min-height: 32px; padding: 5px 10px 5px 0; font-size: 12px; }
 .library-empty, .library-placeholder-section > p { color: var(--muted); }
 .library-placeholder-section { padding: 20px; border: 1px dashed var(--border); border-radius: 12px; background: var(--surface); }
 .library-error { color: var(--error); }
@@ -52,6 +57,12 @@
 .library-editor-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 4px; }
 .review-panel { display: grid; gap: 14px; }
 .review-panel h2 { overflow-wrap: anywhere; }
+.public-reviews-page { display: grid; justify-items: start; gap: 18px; text-align: left; }
+.public-reviews-page > header { text-align: left; }
+.public-reviews-page h1 { margin: 5px 0 0; font: 500 clamp(28px, 3vw, 40px)/1.2 var(--serif); }
+.public-reviews-back { justify-self: start; }
+.public-review-list { width: 100%; text-align: left; }
+.public-review-list .review-entry { text-align: left; }
 .review-average { margin: -8px 0 0; color: var(--muted); }
 .review-list { display: grid; gap: 9px; max-height: 230px; overflow-y: auto; }
 .review-list > p { margin: 0; color: var(--muted); }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { BookOpen, Dice5, Film } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
@@ -58,6 +58,35 @@ interface ReviewTarget {
   title: string
 }
 
+function MyRating({ rating, onClick }: { rating: number | null; onClick: () => void }) {
+  const { t } = useI18n()
+  return (
+    <button
+      className="library-my-rating"
+      type="button"
+      onClick={onClick}
+      aria-label={`${t('myRating')}: ${rating === null ? t('reviewNoRating') : `${rating} / 10`}. ${t('yourReview')}`}
+    >
+      <span>{t('myRating')}</span>
+      {rating === null
+        ? <strong aria-label={t('reviewNoRating')}>–</strong>
+        : <>
+          <strong>{rating} / 10</strong>
+          <span
+            className="library-my-rating-track"
+            role="progressbar"
+            aria-label={`${t('myRating')}: ${rating} / 10`}
+            aria-valuemin={0}
+            aria-valuemax={10}
+            aria-valuenow={rating}
+          >
+            <span style={{ width: `${rating * 10}%` }} />
+          </span>
+        </>}
+    </button>
+  )
+}
+
 async function errorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const payload: unknown = await response.json()
@@ -115,6 +144,16 @@ export function LibraryPage() {
     if (isValidYear(yearTo)) params.set('year_to', yearTo)
     return params.toString()
   }, [scope, sort, yearFrom, yearTo])
+  const updateReviewRating = useCallback((rating: number | null) => {
+    if (!reviewTarget) return
+    if (reviewTarget.catalogType === 'movies') {
+      setMovies((current) => current.map((entry) => entry.movie.id === reviewTarget.itemId ? { ...entry, my_rating: rating } : entry))
+    } else if (reviewTarget.catalogType === 'books') {
+      setBooks((current) => current.map((entry) => entry.book.id === reviewTarget.itemId ? { ...entry, my_rating: rating } : entry))
+    } else {
+      setBoardGames((current) => current.map((entry) => entry.board_game.id === reviewTarget.itemId ? { ...entry, my_rating: rating } : entry))
+    }
+  }, [reviewTarget])
   const visibleMovies = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     return !query ? movies : movies.filter(({ movie }) =>
@@ -379,7 +418,7 @@ export function LibraryPage() {
         {error && <p className="library-error" role="alert">{error}</p>}
         {loading ? <p role="status">{t('loading')}</p> : movies.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('librarySearchEmpty') : t('libraryNoMovies')}</p> : visibleMovies.length === 0 ? <p className="library-empty">{t('librarySearchEmpty')}</p> : (
           <div className="library-movie-grid">
-            {visibleMovies.map(({ movie, clubs }) => (
+            {visibleMovies.map(({ movie, clubs, my_rating }) => (
               <article className="library-movie-card" key={movie.id}>
                 <button className="library-movie-card-trigger" type="button" onClick={() => { setEditingMovie(movie); setEditError('') }} aria-label={`${isAdmin ? t('editMovie') : t('movieDetails')}: ${movie.title}`}>
                   {movie.cover_image_url
@@ -391,11 +430,12 @@ export function LibraryPage() {
                   </div>
                 </button>
                 <div className="library-movie-details library-movie-club-details">
-                  <div className="library-clubs">
+                  {clubs.length > 0 && <div className="library-clubs">
                     <span>{t('libraryClubsLabel')}</span>
                     {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
-                  </div>
-                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'movies', itemId: movie.id, title: localizedMovieTitle(movie, language) })}>{t('reviews')}</button>
+                  </div>}
+                  <MyRating rating={my_rating} onClick={() => setReviewTarget({ catalogType: 'movies', itemId: movie.id, title: localizedMovieTitle(movie, language) })} />
+                  <Link className="button button-light library-review-button" to={`/library/reviews/movies/${movie.id}`} state={{ title: localizedMovieTitle(movie, language) }}>{t('reviews')}</Link>
                 </div>
               </article>
             ))}
@@ -443,7 +483,7 @@ export function LibraryPage() {
         {booksError && <p className="library-error" role="alert">{booksError}</p>}
         {booksLoading ? <p role="status">{t('loading')}</p> : books.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('libraryBookSearchEmpty') : t('libraryNoBooks')}</p> : visibleBooks.length === 0 ? <p className="library-empty">{t('libraryBookSearchEmpty')}</p> : (
           <div className="library-movie-grid">
-            {visibleBooks.map(({ book, clubs }) => (
+            {visibleBooks.map(({ book, clubs, my_rating }) => (
               <article className="library-movie-card" key={book.id}>
                 <button className="library-movie-card-trigger" type="button" onClick={() => { setEditingBook(book); setBookEditError('') }} aria-label={`${isAdmin ? t('editBook') : t('bookDetails')}: ${localizedBookTitle(book, language)}`}>
                   {book.cover_image_url ? <img src={book.cover_image_url} alt="" /> : <div className="library-movie-placeholder" aria-hidden="true"><BookOpen size={25} /></div>}
@@ -454,11 +494,12 @@ export function LibraryPage() {
                   </div>
                 </button>
                 <div className="library-movie-details library-movie-club-details">
-                  <div className="library-clubs">
+                  {clubs.length > 0 && <div className="library-clubs">
                     <span>{t('libraryClubsLabel')}</span>
                     {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
-                  </div>
-                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'books', itemId: book.id, title: localizedBookTitle(book, language) })}>{t('reviews')}</button>
+                  </div>}
+                  <MyRating rating={my_rating} onClick={() => setReviewTarget({ catalogType: 'books', itemId: book.id, title: localizedBookTitle(book, language) })} />
+                  <Link className="button button-light library-review-button" to={`/library/reviews/books/${book.id}`} state={{ title: localizedBookTitle(book, language) }}>{t('reviews')}</Link>
                 </div>
               </article>
             ))}
@@ -503,7 +544,7 @@ export function LibraryPage() {
         {boardGamesError && <p className="library-error" role="alert">{boardGamesError}</p>}
         {boardGamesLoading ? <p role="status">{t('loading')}</p> : boardGames.length === 0 ? <p className="library-empty">{scope === 'mine' ? t('libraryMineEmpty') : yearFrom || yearTo ? t('libraryBoardGameSearchEmpty') : t('libraryNoBoardGames')}</p> : visibleBoardGames.length === 0 ? <p className="library-empty">{t('libraryBoardGameSearchEmpty')}</p> : (
           <div className="library-movie-grid">
-            {visibleBoardGames.map(({ board_game: game, clubs }) => (
+            {visibleBoardGames.map(({ board_game: game, clubs, my_rating }) => (
               <article className="library-movie-card library-board-game-card" key={game.id}>
                 {isSuperuser ? (
                   <button className="library-board-game-edit-trigger" type="button" onClick={() => { setEditingBoardGame(game); setBoardGameEditError('') }} aria-label={`${t('editBoardGame')}: ${game.title}`}>
@@ -522,11 +563,12 @@ export function LibraryPage() {
                   {(game.min_players || game.max_players) && <p>{game.min_players ?? '?'}–{game.max_players ?? '?'} {t('players')}</p>}
                 </div>
                 <div className="library-movie-details library-movie-club-details">
-                  <div className="library-clubs">
+                  {clubs.length > 0 && <div className="library-clubs">
                     <span>{t('libraryClubsLabel')}</span>
                     {clubs.map((club) => <Link key={club.id} to={`/clubs/${club.id}`}>{club.title}</Link>)}
-                  </div>
-                  <button className="button button-light library-review-button" type="button" onClick={() => setReviewTarget({ catalogType: 'board-games', itemId: game.id, title: localizedBoardGameTitle(game, language) })}>{t('reviews')}</button>
+                  </div>}
+                  <MyRating rating={my_rating} onClick={() => setReviewTarget({ catalogType: 'board-games', itemId: game.id, title: localizedBoardGameTitle(game, language) })} />
+                  <Link className="button button-light library-review-button" to={`/library/reviews/board-games/${game.id}`} state={{ title: localizedBoardGameTitle(game, language) }}>{t('reviews')}</Link>
                 </div>
               </article>
             ))}
@@ -555,7 +597,12 @@ export function LibraryPage() {
           </section>
         </div>
       )}
-      {reviewTarget && accessToken && <ReviewPanel {...reviewTarget} accessToken={accessToken} onClose={() => setReviewTarget(null)} />}
+      {reviewTarget && accessToken && <ReviewPanel
+        {...reviewTarget}
+        accessToken={accessToken}
+        onClose={() => setReviewTarget(null)}
+        onRatingChange={updateReviewRating}
+      />}
     </section>
   )
 }

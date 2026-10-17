@@ -11,6 +11,7 @@ from app.backend.movies.clients.tmdb import TMDBMovieClient
 from app.backend.clubs.models import Club, ClubMember, ClubType
 from app.backend.events.models import Event, EventStatus
 from app.backend.movies.models import Movie, MovieTranslation
+from app.backend.reviews.models import MovieReview
 from app.backend.movies.schemas import (
     LibraryClubReference,
     LibraryMovieResponse,
@@ -134,10 +135,19 @@ async def list_library_movies(
         Movie.title,
     )
     movies = db.scalars(query).all()
+    ratings = dict(
+        db.execute(
+            select(MovieReview.movie_id, MovieReview.rating).where(
+                MovieReview.reviewer_id == profile.id,
+                MovieReview.movie_id.in_([movie.id for movie in movies]),
+            )
+        ).all()
+    ) if movies else {}
     library = {
         movie.id: LibraryMovieResponse(
             movie=MovieResponse.model_validate(movie),
             clubs=[],
+            my_rating=ratings.get(movie.id),
         )
         for movie in movies
     }

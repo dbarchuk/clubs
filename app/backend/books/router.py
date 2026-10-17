@@ -14,6 +14,7 @@ from app.backend.books.localization import (
     is_ukrainian_text,
 )
 from app.backend.books.models import Book, BookTranslation
+from app.backend.reviews.models import BookReview
 from app.backend.books.schemas import (
     BookClubReference,
     BookCreate,
@@ -182,8 +183,20 @@ async def list_library_books(
         Book.title,
     )
     books = db.scalars(query).all()
+    ratings = dict(
+        db.execute(
+            select(BookReview.book_id, BookReview.rating).where(
+                BookReview.reviewer_id == profile.id,
+                BookReview.book_id.in_([book.id for book in books]),
+            )
+        ).all()
+    ) if books else {}
     library = {
-        book.id: LibraryBookResponse(book=BookResponse.model_validate(book), clubs=[])
+        book.id: LibraryBookResponse(
+            book=BookResponse.model_validate(book),
+            clubs=[],
+            my_rating=ratings.get(book.id),
+        )
         for book in books
     }
     rows = db.execute(

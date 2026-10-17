@@ -19,7 +19,7 @@ export type TranslationKey =
   | 'librarySearchPlaceholder' | 'librarySearchEmpty' | 'libraryAdminNoMovies'
   | 'libraryFilters' | 'libraryScope' | 'libraryMine' | 'libraryAll' | 'yearFrom' | 'yearTo'
   | 'librarySort' | 'sortDateAdded' | 'sortYearReleased' | 'libraryMineEmpty'
-  | 'reviews' | 'reviewAverage' | 'reviewNone' | 'yourReview' | 'reviewRating'
+  | 'reviews' | 'reviewAverage' | 'reviewNone' | 'yourReview' | 'reviewRating' | 'myRating'
   | 'reviewNoRating' | 'reviewText' | 'reviewMakePublic' | 'reviewPrivacyHelp'
   | 'reviewPublic' | 'reviewPrivate' | 'saveReview' | 'deleteReview'
   | 'reviewLoadError' | 'reviewSaveError' | 'reviewDeleteError'

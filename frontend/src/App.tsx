@@ -7,6 +7,7 @@ import { ClubManagementPage } from './pages/ClubManagementPage'
 import { ClubDetailsPage } from './pages/ClubDetailsPage'
 import { PublicHomePage } from './pages/PublicHomePage'
 import { LibraryPage } from './pages/LibraryPage'
+import { PublicReviewsPage } from './reviews/PublicReviewsPage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import mainIcon from './assets/main_icon.png'
 import { Users, Globe2, Library, LogOut, Search, ShieldCheck, UserCog } from 'lucide-react'
@@ -132,6 +133,7 @@ function App() {
             <Route path="/my-clubs" element={<ClubListPage key="my-clubs" scope="my" searchQuery={searchQuery} />} />
             <Route path="/public-clubs" element={<ClubListPage key="public-clubs" scope="public" searchQuery={searchQuery} />} />
             <Route path="/library" element={<LibraryPage />} />
+            <Route path="/library/reviews/:catalogType/:itemId" element={<PublicReviewsPage />} />
             <Route path="/user-management" element={<UserManagementPage />} />
             <Route path="/clubs/:clubId/manage" element={<ClubManagementPage />} />
             <Route path="/clubs/:clubId" element={<ClubDetailsPage />} />

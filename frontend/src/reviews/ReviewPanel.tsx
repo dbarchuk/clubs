@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
-import type { ReviewCatalogType, ReviewList } from '../types/supabase'
+import type { ReviewCatalogType, ReviewList, ReviewRecord } from '../types/supabase'
 
 interface ReviewPanelProps {
   catalogType: ReviewCatalogType
@@ -8,6 +8,7 @@ interface ReviewPanelProps {
   title: string
   accessToken: string
   onClose: () => void
+  onRatingChange: (rating: number | null) => void
 }
 
 async function getError(response: Response, fallback: string): Promise<string> {
@@ -22,7 +23,7 @@ async function getError(response: Response, fallback: string): Promise<string> {
   return fallback
 }
 
-export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose }: ReviewPanelProps) {
+export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose, onRatingChange }: ReviewPanelProps) {
   const { t } = useI18n()
   const [data, setData] = useState<ReviewList | null>(null)
   const [rating, setRating] = useState('')
@@ -43,6 +44,7 @@ export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose }
       const result = await response.json() as ReviewList
       setData(result)
       const ownReview = result.reviews.find((review) => review.is_mine)
+      onRatingChange(ownReview?.rating ?? null)
       setRating(ownReview?.rating === null || ownReview?.rating === undefined ? '' : String(ownReview.rating))
       setBody(ownReview?.body ?? '')
       setIsPublic(ownReview?.is_public ?? false)
@@ -51,7 +53,7 @@ export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose }
     } finally {
       setLoading(false)
     }
-  }, [accessToken, catalogType, itemId, t])
+  }, [accessToken, catalogType, itemId, onRatingChange, t])
 
   useEffect(() => {
     void loadReviews()
@@ -68,7 +70,9 @@ export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose }
         body: JSON.stringify({ rating: rating ? Number(rating) : null, body: body.trim() || null, is_public: isPublic }),
       })
       if (!response.ok) throw new Error(await getError(response, t('reviewSaveError')))
-      await loadReviews()
+      const savedReview = await response.json() as ReviewRecord
+      onRatingChange(savedReview.rating)
+      onClose()
     } catch (saveError: unknown) {
       setError(saveError instanceof Error ? saveError.message : t('reviewSaveError'))
     } finally {
@@ -96,20 +100,9 @@ export function ReviewPanel({ catalogType, itemId, title, accessToken, onClose }
   return (
     <div className="library-editor-backdrop" onClick={onClose}>
       <section className="library-editor review-panel" role="dialog" aria-modal="true" aria-labelledby="review-panel-title" onClick={(event) => event.stopPropagation()}>
-        <h2 id="review-panel-title">{t('reviews')}: {title}</h2>
-        {data?.average_rating !== null && data?.average_rating !== undefined && <p className="review-average">{t('reviewAverage')}: {data.average_rating.toFixed(1)} / 10</p>}
+        <h2 id="review-panel-title">{t('yourReview')}: {title}</h2>
         {loading ? <p role="status">{t('loading')}</p> : data ? <>
-          <section className="review-list" aria-label={t('reviews')}>
-            {data?.reviews.length ? data.reviews.map((review) => (
-              <article className="review-entry" key={review.id}>
-                <header><strong>{review.reviewer_name}</strong>{review.rating !== null && <span>{review.rating} / 10</span>}</header>
-                {review.body && <p>{review.body}</p>}
-                {review.is_mine && <small>{review.is_public ? t('reviewPublic') : t('reviewPrivate')}</small>}
-              </article>
-            )) : <p>{t('reviewNone')}</p>}
-          </section>
           <form className="review-form" onSubmit={(event) => { void saveReview(event) }}>
-            <h3>{t('yourReview')}</h3>
             <label>{t('reviewRating')}
               <select value={rating} onChange={(event) => setRating(event.target.value)}>
                 <option value="">{t('reviewNoRating')}</option>
