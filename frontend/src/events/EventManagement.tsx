@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { useI18n } from '../lib/i18n-context'
 import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedBookTitle, localizedMovieTitle } from '../lib/catalog-localization'
-import type { BookRecord, BookSearchResult, BoardGameRecord, BoardGameSearchResult, EventRecord, MovieRecord, MovieSearchResult } from '../types/supabase'
+import { ReviewPanel } from '../reviews/ReviewPanel'
+import type { BookRecord, BookSearchResult, BoardGameRecord, BoardGameSearchResult, EventRecord, MovieRecord, MovieSearchResult, ReviewCatalogType } from '../types/supabase'
 import './events.css'
 
 const DEFAULT_NOTICE_DURATION_MS = 5_000
@@ -9,6 +10,14 @@ const configuredNoticeDuration = Number(import.meta.env.VITE_NOTIFICATION_DURATI
 const noticeDurationMs = Number.isFinite(configuredNoticeDuration) && configuredNoticeDuration >= 0
   ? configuredNoticeDuration
   : DEFAULT_NOTICE_DURATION_MS
+
+interface ReviewTarget {
+  catalogType: ReviewCatalogType
+  itemId: number
+  title: string
+}
+
+function ignoreRatingChange(_rating: number | null): void {}
 
 interface EventManagementProps {
   clubId: string
@@ -37,6 +46,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [searchingMovies, setSearchingMovies] = useState(false)
   const [savingMovie, setSavingMovie] = useState(false)
   const [activeMovieStatusEditor, setActiveMovieStatusEditor] = useState<string | null>(null)
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [title, setTitle] = useState('')
@@ -432,6 +442,16 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     ? events.filter((record) => record.status !== 'held' && record.start_date === null)
     : []
   const heldEvents = events.filter((record) => record.status === 'held')
+
+  const openEventReview = (record: EventRecord) => {
+    if (record.linked_movie) {
+      setReviewTarget({ catalogType: 'movies', itemId: record.linked_movie.id, title: localizedMovieTitle(record.linked_movie, language) })
+    } else if (record.linked_board_game) {
+      setReviewTarget({ catalogType: 'board-games', itemId: record.linked_board_game.id, title: localizedBoardGameTitle(record.linked_board_game, language) })
+    } else if (record.linked_book) {
+      setReviewTarget({ catalogType: 'books', itemId: record.linked_book.id, title: localizedBookTitle(record.linked_book, language) })
+    }
+  }
   const upcomingEvents = events
     .filter((record) =>
       record.status !== 'held' && record.status !== 'cancelled'
@@ -442,6 +462,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const renderEvent = (record: EventRecord) => (
     clubType === 'movie' || clubType === 'board_games' ? renderCatalogEvent(record) : (
     <li className="event-card" key={record.id}>
+      <button className="event-review-card-content" type="button" disabled={!record.linked_movie && !record.linked_board_game && !record.linked_book} onClick={() => openEventReview(record)}>
       {(record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url || ''} alt="" />}
       <div className="event-card-content">
         <h3>{record.linked_book && (!record.title || record.title === record.linked_book.title || record.linked_book.translations.some((translation) => translation.title === record.title))
@@ -450,6 +471,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         <p>{record.start_date ? `${record.start_date}${record.end_date && record.end_date !== record.start_date ? ` – ${record.end_date}` : ''}${record.start_time ? ` · ${record.start_time.slice(0, 5)}–${record.end_time?.slice(0, 5) ?? ''}` : ` · ${t('allDay')}`}` : t('eventQueue')}</p>
         <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
       </div>
+      </button>
       {canManage && <div className="event-card-actions">
         <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
         <label><span className="visually-hidden">{t('eventStatus')}</span><select value={record.status} onChange={(event) => void updateStatus(record, event.target.value as EventRecord['status'])}>
@@ -490,19 +512,18 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
 
     return (
       <li className="movie-event-card" key={record.id}>
-        {canManage ? (
-          <button
+        <button
             className="movie-event-card-trigger"
             type="button"
-            aria-expanded={activeMovieStatusEditor === record.id}
-            aria-label={`${record.title || linkedTitle || t('clubEvent')} · ${t('eventStatus')}`}
-            onClick={() => setActiveMovieStatusEditor((activeId) => activeId === record.id ? null : record.id)}
+            aria-label={`${displayedTitle} · ${t('reviews')}`}
+            onClick={() => openEventReview(record)}
           >
             {cardContent}
           </button>
-        ) : <div className="movie-event-card-trigger">{cardContent}</div>}
-        {canManage && activeMovieStatusEditor === record.id && (
+        {canManage && (
           <div className="movie-event-card-editor">
+            <button className="button button-light" type="button" aria-expanded={activeMovieStatusEditor === record.id} onClick={() => setActiveMovieStatusEditor((activeId) => activeId === record.id ? null : record.id)}>{t('eventStatus')}</button>
+            {activeMovieStatusEditor === record.id && <>
             <label>
               <span>{t('eventStatus')}</span>
               <select value={record.status} onChange={(event) => void updateStatus(record, event.target.value as EventRecord['status'])}>
@@ -516,6 +537,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
               <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
               <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
             </div>
+            </>}
           </div>
         )}
       </li>
@@ -643,6 +665,12 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         {(clubType === 'movie' || clubType === 'book') && <section aria-labelledby="event-queue-title"><h3 id="event-queue-title">{t('eventQueue')}</h3>{queueEvents.length ? <ul className={eventListClassName}>{queueEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>}
         <section aria-labelledby="held-events-title"><h3 id="held-events-title">{t('heldEvents')}</h3>{heldEvents.length ? <ul className={eventListClassName}>{heldEvents.map(renderEvent)}</ul> : <p>{t('noEvents')}</p>}</section>
       </div>}
+      {reviewTarget && <ReviewPanel
+        {...reviewTarget}
+        accessToken={accessToken}
+        onClose={() => setReviewTarget(null)}
+        onRatingChange={ignoreRatingChange}
+      />}
     </section>
   )
 }

@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase'
 import type { Profile } from '../types/supabase'
 import { AuthContext } from './auth-context'
 
+async function syncApiSession(session: Session | null): Promise<void> {
+  if (!session) {
+    await fetch('/api/users/session', { method: 'DELETE' })
+    return
+  }
+  const response = await fetch('/api/users/session', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  })
+  if (!response.ok) throw new Error('Could not establish API session')
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -14,15 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) {
       return
     }
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      await syncApiSession(session).catch(() => undefined)
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      void syncApiSession(newSession).catch(() => undefined)
       setSession(newSession)
       setUser(newSession?.user ?? null)
       setProfile((currentProfile) =>
@@ -123,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) throw new Error('Supabase client not configured')
     const { error } = await supabase.auth.signOut()
     if (error) throw error
+    await syncApiSession(null)
   }, [])
 
   const updateProfile = useCallback((updatedProfile: Profile) => {

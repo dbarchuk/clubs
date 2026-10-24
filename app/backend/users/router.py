@@ -1,9 +1,12 @@
 import logging
+from asyncio import Lock
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from time import monotonic
+from urllib.parse import urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt as jose_jwt
 from jose.exceptions import JWTError
@@ -25,7 +28,97 @@ from app.core.logging import log_external_error
 router = APIRouter(prefix="/users", tags=["users"])
 logger = logging.getLogger(__name__)
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
+required_bearer = HTTPBearer()
+AUTH_COOKIE_NAME = "clubs_access_token"
+_JWKS_CACHE_TTL_SECONDS = 300
+_JWKS_STALE_FALLBACK_SECONDS = 1800
+_JWKS_FORCED_REFRESH_COOLDOWN_SECONDS = 30
+_jwks_cache: dict[str, object] | None = None
+_jwks_cache_expires_at = 0.0
+_jwks_cache_stale_until = 0.0
+_jwks_last_forced_refresh_at = 0.0
+_jwks_cache_lock = Lock()
+
+
+async def get_supabase_jwks(*, force_refresh: bool = False) -> dict[str, object]:
+    """Cache Supabase signing keys and tolerate short provider outages."""
+    global _jwks_cache, _jwks_cache_expires_at, _jwks_cache_stale_until
+    global _jwks_last_forced_refresh_at
+
+    now = monotonic()
+    if _jwks_cache is not None and now < _jwks_cache_expires_at and not force_refresh:
+        return _jwks_cache
+    if (
+        force_refresh
+        and _jwks_cache is not None
+        and now - _jwks_last_forced_refresh_at < _JWKS_FORCED_REFRESH_COOLDOWN_SECONDS
+    ):
+        return _jwks_cache
+
+    async with _jwks_cache_lock:
+        now = monotonic()
+        if _jwks_cache is not None and now < _jwks_cache_expires_at and not force_refresh:
+            return _jwks_cache
+        if (
+            force_refresh
+            and _jwks_cache is not None
+            and now - _jwks_last_forced_refresh_at < _JWKS_FORCED_REFRESH_COOLDOWN_SECONDS
+        ):
+            return _jwks_cache
+        if force_refresh:
+            _jwks_last_forced_refresh_at = now
+
+        try:
+            jwks_url = settings.supabase_jwks_url
+            if not jwks_url:
+                raise ValueError("Supabase JWKS URL is not configured")
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(jwks_url)
+                response.raise_for_status()
+            jwks = response.json()
+            if not isinstance(jwks, dict) or not isinstance(jwks.get("keys"), list):
+                raise ValueError("Supabase returned an invalid JWKS document")
+            _jwks_cache = jwks
+            _jwks_cache_expires_at = monotonic() + _JWKS_CACHE_TTL_SECONDS
+            _jwks_cache_stale_until = (
+                _jwks_cache_expires_at + _JWKS_STALE_FALLBACK_SECONDS
+            )
+            return jwks
+        except (httpx.HTTPError, ValueError) as exc:
+            log_external_error(logger, "Supabase JWKS retrieval failed", exc)
+            if _jwks_cache is not None and monotonic() < _jwks_cache_stale_until:
+                logger.warning("Using cached Supabase signing keys during provider outage")
+                return _jwks_cache
+            raise
+
+
+def find_signing_key(jwks: dict[str, object], key_id: str) -> dict[str, object] | None:
+    keys = jwks.get("keys")
+    if not isinstance(keys, list):
+        return None
+    return next(
+        (
+            key
+            for key in keys
+            if isinstance(key, dict) and key.get("kid") == key_id
+        ),
+        None,
+    )
+
+
+def ensure_same_origin_write(request: Request) -> None:
+    if request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    origin = request.headers.get("origin")
+    request_origin = urlsplit(str(request.base_url))
+    supplied_origin = urlsplit(origin or "")
+    if (
+        not origin
+        or supplied_origin.scheme != request_origin.scheme
+        or supplied_origin.netloc != request_origin.netloc
+    ):
+        raise HTTPException(status_code=403, detail="Cross-origin request is not allowed")
 
 
 def is_superuser_email(email: str) -> bool:
@@ -72,10 +165,7 @@ def get_metadata_string(metadata: object, *keys: str) -> str | None:
     return None
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> SupabaseUser:
-    token = credentials.credentials
+async def verify_access_token(token: str) -> SupabaseUser:
     if not settings.supabase_url or not settings.supabase_jwks_url:
         raise HTTPException(status_code=503, detail="Supabase authentication is not configured")
 
@@ -90,20 +180,19 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(settings.supabase_jwks_url)
-            response.raise_for_status()
-        jwks = response.json()
+        jwks = await get_supabase_jwks()
     except (httpx.HTTPError, ValueError) as exc:
-        log_external_error(logger, "Supabase JWKS retrieval failed", exc)
         raise HTTPException(status_code=503, detail="Unable to verify token") from exc
 
-    signing_key = next(
-        (key for key in jwks.get("keys", []) if key.get("kid") == key_id),
-        None,
-    )
+    signing_key = find_signing_key(jwks, key_id)
     if signing_key is None:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        try:
+            jwks = await get_supabase_jwks(force_refresh=True)
+        except (httpx.HTTPError, ValueError) as exc:
+            raise HTTPException(status_code=503, detail="Unable to verify token") from exc
+        signing_key = find_signing_key(jwks, key_id)
+        if signing_key is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
 
     try:
         payload = jose_jwt.decode(
@@ -142,6 +231,25 @@ async def get_current_user(
         display_name=display_name,
         avatar_url=avatar_url,
     )
+
+
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> SupabaseUser:
+    token = request.cookies.get(AUTH_COOKIE_NAME)
+    if token:
+        ensure_same_origin_write(request)
+        try:
+            return await verify_access_token(token)
+        except HTTPException as exc:
+            if credentials is None or exc.status_code != status.HTTP_401_UNAUTHORIZED:
+                raise
+    if credentials is not None:
+        token = credentials.credentials
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return await verify_access_token(token)
 
 
 async def get_current_profile(
@@ -189,6 +297,47 @@ async def get_me(
 ) -> ProfileResponse:
     profile = ensure_superuser_admin(profile, db)
     return profile_response(profile)
+
+
+@router.post("/session", status_code=status.HTTP_204_NO_CONTENT)
+async def create_session_cookie(
+    request: Request,
+    response: Response,
+    credentials: HTTPAuthorizationCredentials = Depends(required_bearer),
+) -> Response:
+    await verify_access_token(credentials.credentials)
+    try:
+        expires_at = jose_jwt.get_unverified_claims(credentials.credentials).get("exp")
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    if not isinstance(expires_at, (int, float)):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    max_age = int(expires_at - datetime.now(UTC).timestamp())
+    if max_age <= 0:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=credentials.credentials,
+        max_age=max_age,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/api",
+    )
+    return response
+
+
+@router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_session_cookie(request: Request, response: Response) -> Response:
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        path="/api",
+    )
+    return response
 
 
 @router.get("/management", response_model=UserManagementResponse)

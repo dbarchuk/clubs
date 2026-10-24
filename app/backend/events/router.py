@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from app.backend.board_games.models import BoardGame
@@ -129,7 +129,16 @@ async def list_club_events(
             Event.deleted_at.is_(None),
             Event.status != EventStatus.DELETED,
         )
-        .order_by(Event.start_date, Event.start_time, Event.created_at)
+        .order_by(
+            case((Event.status == EventStatus.HELD, 0), else_=1),
+            case(
+                (Event.status == EventStatus.HELD, Event.start_date),
+                else_=None,
+            ).desc().nullslast(),
+            Event.start_date,
+            Event.start_time,
+            Event.created_at,
+        )
     ).all()
     return [to_event_response(db, event, club) for event in events]
 
@@ -185,7 +194,7 @@ async def create_club_event(
             EventStatus.HELD
             if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK}
             and payload.start_date is not None
-            and payload.start_date < datetime.now(UTC).date()
+            and payload.start_date <= datetime.now(UTC).date()
             else EventStatus.SCHEDULED
         ),
         created_by=profile.id,
