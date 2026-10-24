@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { CalendarClock, Check, Clock, Settings, X } from 'lucide-react'
 import { useI18n } from '../lib/i18n-context'
 import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedBookTitle, localizedMovieTitle } from '../lib/catalog-localization'
 import { ReviewPanel } from '../reviews/ReviewPanel'
@@ -16,8 +17,6 @@ interface ReviewTarget {
   itemId: number
   title: string
 }
-
-function ignoreRatingChange(_rating: number | null): void {}
 
 interface EventManagementProps {
   clubId: string
@@ -46,6 +45,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [searchingMovies, setSearchingMovies] = useState(false)
   const [savingMovie, setSavingMovie] = useState(false)
   const [activeMovieStatusEditor, setActiveMovieStatusEditor] = useState<string | null>(null)
+  const [activeEventActionsEditor, setActiveEventActionsEditor] = useState<string | null>(null)
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -76,6 +76,19 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [hasSearchedGoogleBooks, setHasSearchedGoogleBooks] = useState(false)
   const [selectedBook, setSelectedBook] = useState<BookRecord | null>(null)
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null)
+  const [pendingEventStatus, setPendingEventStatus] = useState<EventRecord['status'] | null>(null)
+
+  const updateEventRating = useCallback((rating: number | null) => {
+    if (!reviewTarget) return
+    setEvents((current) => current.map((record) => {
+      const matchesTarget = reviewTarget.catalogType === 'movies'
+        ? record.linked_movie?.id === reviewTarget.itemId
+        : reviewTarget.catalogType === 'books'
+          ? record.linked_book?.id === reviewTarget.itemId
+          : record.linked_board_game?.id === reviewTarget.itemId
+      return matchesTarget ? { ...record, my_rating: rating } : record
+    }))
+  }, [reviewTarget])
 
   const loadEvents = useCallback(async () => {
     const response = await fetch(`/api/events/clubs/${clubId}`, { headers: { Authorization: `Bearer ${accessToken}` } })
@@ -345,6 +358,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
 
   const startEditing = (record: EventRecord) => {
     setEditingEvent(record)
+    setActiveEventActionsEditor(null)
     onFormOpenChange(true)
     setTitle(record.title ?? '')
     setLinkedItemId(record.linked_item_id ?? '')
@@ -379,11 +393,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     const isBoardGameClub = clubType === 'board_games'
     const isBookClub = clubType === 'book'
     const isCatalogEvent = isMovieClub || isBoardGameClub || isBookClub
-    const url = editingEvent
-      ? `/api/events/${editingEvent.id}`
-      : `/api/events/clubs/${clubId}`
     try {
-      const response = await fetch(url, {
+      const response = await fetch(editingEvent ? `/api/events/${editingEvent.id}` : `/api/events/clubs/${clubId}`, {
         method: editingEvent ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
@@ -420,6 +431,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       if (!response.ok) throw new Error(await errorMessage(response, t('eventUpdateError')))
       await loadEvents()
       setActiveMovieStatusEditor(null)
+      setPendingEventStatus(null)
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : t('eventUpdateError'))
     }
@@ -432,6 +444,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       const response = await fetch(`/api/events/${record.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } })
       if (!response.ok) throw new Error(await errorMessage(response, t('eventDeleteError')))
       await loadEvents()
+      setActiveEventActionsEditor(null)
       setNotice(t('eventDeleted'))
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : t('eventDeleteError'))
@@ -442,6 +455,79 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     ? events.filter((record) => record.status !== 'held' && record.start_date === null)
     : []
   const heldEvents = events.filter((record) => record.status === 'held')
+
+  const toggleEventStatusEditor = (record: EventRecord) => {
+    if (activeMovieStatusEditor === record.id) {
+      setActiveMovieStatusEditor(null)
+      setPendingEventStatus(null)
+      return
+    }
+    setActiveEventActionsEditor(null)
+    setActiveMovieStatusEditor(record.id)
+    setPendingEventStatus(record.status)
+  }
+
+  const toggleEventActionsEditor = (record: EventRecord) => {
+    setActiveMovieStatusEditor(null)
+    setPendingEventStatus(null)
+    setActiveEventActionsEditor((activeId) => activeId === record.id ? null : record.id)
+  }
+
+  const cancelEventStatusEdit = () => {
+    setActiveMovieStatusEditor(null)
+    setPendingEventStatus(null)
+  }
+
+  const confirmEventStatus = (record: EventRecord) => {
+    if (pendingEventStatus && pendingEventStatus !== record.status) {
+      void updateStatus(record, pendingEventStatus)
+    }
+  }
+
+  const renderEventStatus = (record: EventRecord) => {
+    const label = t(`eventStatus_${record.status}`)
+    const className = `event-status-icon event-status-icon-${record.status}`
+    const Icon = record.status === 'held'
+      ? Check
+      : record.status === 'cancelled'
+        ? X
+        : record.status === 'delayed'
+          ? CalendarClock
+          : Clock
+    return canManage ? (
+      <button
+        className={`${className} event-status-trigger`}
+        type="button"
+        aria-label={`${t('eventStatus')}: ${label}`}
+        title={`${t('eventStatus')}: ${label}`}
+        aria-expanded={activeMovieStatusEditor === record.id}
+        onClick={() => toggleEventStatusEditor(record)}
+      >
+        <Icon aria-hidden="true" size={18} />
+      </button>
+    ) : <span className={className} role="img" aria-label={`${t('eventStatus')}: ${label}`} title={`${t('eventStatus')}: ${label}`}><Icon aria-hidden="true" size={18} /></span>
+  }
+
+  const renderEventActions = (record: EventRecord) => canManage ? (
+    <button
+      className="event-actions-icon"
+      type="button"
+      aria-label={t('eventActions')}
+      title={t('eventActions')}
+      aria-expanded={activeEventActionsEditor === record.id}
+      onClick={() => toggleEventActionsEditor(record)}
+    >
+      <Settings aria-hidden="true" size={17} />
+    </button>
+  ) : null
+
+  const renderEventRating = (record: EventRecord) => record.my_rating !== null && record.my_rating !== undefined ? (
+    <span className="event-my-rating" aria-label={`${t('myRating')}: ${record.my_rating} / 10`}>
+      <span>{t('myRating')}</span>
+      <strong>{record.my_rating} / 10</strong>
+      <span className="event-my-rating-track" aria-hidden="true"><span style={{ width: `${record.my_rating * 10}%` }} /></span>
+    </span>
+  ) : null
 
   const openEventReview = (record: EventRecord) => {
     if (record.linked_movie) {
@@ -462,6 +548,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const renderEvent = (record: EventRecord) => (
     clubType === 'movie' || clubType === 'board_games' ? renderCatalogEvent(record) : (
     <li className="event-card" key={record.id}>
+      {renderEventStatus(record)}
+      {renderEventActions(record)}
       <button className="event-review-card-content" type="button" disabled={!record.linked_movie && !record.linked_board_game && !record.linked_book} onClick={() => openEventReview(record)}>
       {(record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url) && <img src={record.avatar_url || record.linked_movie?.cover_image_url || record.linked_board_game?.cover_image_url || record.linked_book?.cover_image_url || ''} alt="" />}
       <div className="event-card-content">
@@ -469,14 +557,18 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
           ? localizedBookTitle(record.linked_book, language)
           : record.title || record.linked_movie?.title || record.linked_board_game?.title || record.linked_book?.title || t('clubEvent')}</h3>
         <p>{record.start_date ? `${record.start_date}${record.end_date && record.end_date !== record.start_date ? ` – ${record.end_date}` : ''}${record.start_time ? ` · ${record.start_time.slice(0, 5)}–${record.end_time?.slice(0, 5) ?? ''}` : ` · ${t('allDay')}`}` : t('eventQueue')}</p>
-        <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
       </div>
       </button>
-      {canManage && <div className="event-card-actions">
-        <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
-        <label><span className="visually-hidden">{t('eventStatus')}</span><select value={record.status} onChange={(event) => void updateStatus(record, event.target.value as EventRecord['status'])}>
+      {renderEventRating(record)}
+      {canManage && activeMovieStatusEditor === record.id && <div className="event-status-editor">
+        <label><span>{t('eventStatus')}</span><select value={pendingEventStatus ?? record.status} onChange={(event) => setPendingEventStatus(event.target.value as EventRecord['status'])}>
           <option value="scheduled">{t('eventStatus_scheduled')}</option><option value="delayed">{t('eventStatus_delayed')}</option><option value="cancelled">{t('eventStatus_cancelled')}</option><option value="held">{t('eventStatus_held')}</option>
         </select></label>
+        <button className="button button-primary" type="button" disabled={!pendingEventStatus || pendingEventStatus === record.status} onClick={() => confirmEventStatus(record)}>OK</button>
+        <button className="button button-light" type="button" onClick={cancelEventStatusEdit}>{t('cancel')}</button>
+      </div>}
+      {canManage && activeEventActionsEditor === record.id && <div className="event-card-actions">
+        <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
         <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
       </div>}
     </li>
@@ -505,13 +597,14 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         <span className="movie-event-card-content">
           <span className="movie-event-card-date">{record.start_date ?? t('eventQueue')}</span>
           <strong>{displayedTitle}</strong>
-          <span className={`event-status event-status-${record.status}`}>{t(`eventStatus_${record.status}`)}</span>
         </span>
       </>
     )
 
     return (
       <li className="movie-event-card" key={record.id}>
+        {renderEventStatus(record)}
+        {renderEventActions(record)}
         <button
             className="movie-event-card-trigger"
             type="button"
@@ -520,13 +613,14 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
           >
             {cardContent}
           </button>
-        {canManage && (
+        <div className="movie-event-card-meta">
+          {renderEventRating(record)}
+        </div>
+        {canManage && activeMovieStatusEditor === record.id && (
           <div className="movie-event-card-editor">
-            <button className="button button-light" type="button" aria-expanded={activeMovieStatusEditor === record.id} onClick={() => setActiveMovieStatusEditor((activeId) => activeId === record.id ? null : record.id)}>{t('eventStatus')}</button>
-            {activeMovieStatusEditor === record.id && <>
             <label>
               <span>{t('eventStatus')}</span>
-              <select value={record.status} onChange={(event) => void updateStatus(record, event.target.value as EventRecord['status'])}>
+              <select value={pendingEventStatus ?? record.status} onChange={(event) => setPendingEventStatus(event.target.value as EventRecord['status'])}>
                 <option value="scheduled">{t('eventStatus_scheduled')}</option>
                 <option value="delayed">{t('eventStatus_delayed')}</option>
                 <option value="cancelled">{t('eventStatus_cancelled')}</option>
@@ -534,12 +628,15 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
               </select>
             </label>
             <div className="event-card-actions">
-              <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
-              <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
+              <button className="button button-primary" type="button" disabled={!pendingEventStatus || pendingEventStatus === record.status} onClick={() => confirmEventStatus(record)}>OK</button>
+              <button className="button button-light" type="button" onClick={cancelEventStatusEdit}>{t('cancel')}</button>
             </div>
-            </>}
           </div>
         )}
+        {canManage && activeEventActionsEditor === record.id && <div className="movie-event-card-editor event-actions-panel">
+          <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
+          <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
+        </div>}
       </li>
     )
   }
@@ -669,7 +766,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         {...reviewTarget}
         accessToken={accessToken}
         onClose={() => setReviewTarget(null)}
-        onRatingChange={ignoreRatingChange}
+        onRatingChange={updateEventRating}
       />}
     </section>
   )

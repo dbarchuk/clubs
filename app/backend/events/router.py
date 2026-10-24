@@ -15,6 +15,7 @@ from app.backend.events.models import Event, EventStatus
 from app.backend.events.schemas import EventCreate, EventResponse, EventUpdate
 from app.backend.movies.models import Movie
 from app.backend.movies.schemas import MovieResponse
+from app.backend.reviews.models import BoardGameReview, BookReview, MovieReview
 from app.backend.users.models import Profile
 from app.backend.users.router import get_active_profile
 from app.core.database import get_db
@@ -115,6 +116,36 @@ def to_event_response(db: Session, event: Event, club: Club) -> EventResponse:
     )
 
 
+def get_my_event_ratings(
+    db: Session, events: list[Event], club: Club, profile_id: str
+) -> dict[int, int | None]:
+    review_config = {
+        ClubType.MOVIE: (MovieReview, MovieReview.movie_id),
+        ClubType.BOARD_GAMES: (BoardGameReview, BoardGameReview.board_game_id),
+        ClubType.BOOK: (BookReview, BookReview.book_id),
+    }.get(club.club_type)
+    if review_config is None:
+        return {}
+    review_model, item_column = review_config
+
+    item_ids = {
+        int(event.linked_item_id)
+        for event in events
+        if event.linked_item_id is not None and event.linked_item_id.isdecimal()
+    }
+    if not item_ids:
+        return {}
+
+    rows = db.execute(
+        select(item_column, review_model.rating).where(
+            item_column.in_(item_ids),
+            review_model.reviewer_id == profile_id,
+            review_model.rating.is_not(None),
+        )
+    ).all()
+    return {item_id: rating for item_id, rating in rows}
+
+
 @router.get("/clubs/{club_id}", response_model=list[EventResponse])
 async def list_club_events(
     club_id: str,
@@ -140,7 +171,13 @@ async def list_club_events(
             Event.created_at,
         )
     ).all()
-    return [to_event_response(db, event, club) for event in events]
+    my_ratings = get_my_event_ratings(db, events, club, profile.id)
+    responses: list[EventResponse] = []
+    for event in events:
+        response = to_event_response(db, event, club)
+        item_id = int(event.linked_item_id) if event.linked_item_id and event.linked_item_id.isdecimal() else None
+        responses.append(response.model_copy(update={"my_rating": my_ratings.get(item_id)}))
+    return responses
 
 
 @router.post(

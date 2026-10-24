@@ -325,6 +325,7 @@ async def create_session_cookie(
         samesite="lax",
         path="/api",
     )
+    response.status_code = status.HTTP_204_NO_CONTENT
     return response
 
 
@@ -337,6 +338,7 @@ async def clear_session_cookie(request: Request, response: Response) -> Response
         samesite="lax",
         path="/api",
     )
+    response.status_code = status.HTTP_204_NO_CONTENT
     return response
 
 

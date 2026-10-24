@@ -69,7 +69,7 @@ export type TranslationKey =
   | 'searchBooks' | 'searchGoogleBooks' | 'bookSearchResults' | 'bookFromGoogleBooks'
   | 'bookAlreadySaved' | 'bookSearchError' | 'bookSaveError' | 'savingBook' | 'removeSelectedBook'
   | 'cancelEditEvent' | 'eventUpdated'
-  | 'clubEvent' | 'allDay' | 'eventStatus' | 'eventStatus_scheduled' | 'eventStatus_delayed'
+  | 'clubEvent' | 'allDay' | 'eventStatus' | 'eventActions' | 'eventStatus_scheduled' | 'eventStatus_delayed'
   | 'upcomingEvents' | 'eventQueue' | 'heldEvents' | 'optional'
   | 'eventStatus_cancelled' | 'eventStatus_held' | 'eventStatus_deleted' | 'deleteEvent'
   | 'confirmDeleteEvent' | 'eventCreated' | 'eventDeleted' | 'eventsLoadError'

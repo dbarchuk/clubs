@@ -54,6 +54,7 @@ export interface EventRecord {
   linked_movie: MovieRecord | null
   linked_board_game: BoardGameRecord | null
   linked_book: BookRecord | null
+  my_rating: number | null
   avatar_url: string | null
   start_date: string | null
   end_date: string | null

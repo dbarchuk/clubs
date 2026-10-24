@@ -64,6 +64,7 @@ class EventResponse(BaseModel):
     linked_movie: MovieResponse | None = None
     linked_board_game: BoardGameResponse | None = None
     linked_book: BookResponse | None = None
+    my_rating: int | None = None
     avatar_url: str | None
     start_date: date | None
     end_date: date | None
