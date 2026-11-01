@@ -1,4 +1,9 @@
 .event-management { display: grid; gap: 1rem; }
+.event-edit-modal { position: fixed; z-index: 1000; top: 50%; left: 50%; width: min(620px, calc(100vw - 32px)); max-height: min(85vh, 900px); overflow-y: auto; transform: translate(-50%, -50%); box-shadow: 0 0 0 100vmax rgb(0 0 0 / 55%), 0 18px 60px rgb(0 0 0 / 30%); }
+.event-edit-actions { align-items: center; }
+.event-delete-button { color: #fff; border: 1px solid #b42318; background: #c9362b; }
+.event-delete-button:hover:not(:disabled) { background: #a92d24; }
+.event-edit-actions .event-delete-button { margin-right: auto; }
 .event-create-trigger { justify-self: start; }
 .event-groups { display: grid; gap: 1.5rem; }
 .event-groups > section { display: grid; gap: .5rem; }
@@ -7,6 +12,7 @@
 .event-management > header p { margin: 0; color: var(--muted); }
 .event-management h2, .event-management h3 { margin: 0; }
 .movie-picker { display: grid; gap: 10px; }
+.boardgamegeek-attribution { justify-self: start; color: var(--muted); font-size: 12px; }
 .movie-picker > .button { justify-self: start; }
 .selected-movie { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--muted); font-size: 12px; }
 .selected-movie img { width: 36px; height: 48px; border-radius: 4px; object-fit: cover; }

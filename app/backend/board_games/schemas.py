@@ -88,13 +88,14 @@ class BoardGameProviderResult(BaseModel):
     """A search hit from an external board game catalog, not yet saved locally."""
 
     id: None = None
-    provider: Literal["geekach"]
+    provider: Literal["geekach", "boardgamegeek"]
     external_id: str
     title: str
     cover_image_url: str | None = None
     product_url: str
     price: float | None = None
     in_stock: bool | None = None
+    year_published: int | None = None
 
 
 class BoardGameClubReference(BaseModel):

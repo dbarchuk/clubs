@@ -189,13 +189,14 @@ export interface BoardGameRecord {
 
 export interface BoardGameProviderResult {
   id: null
-  provider: 'geekach'
+  provider: 'geekach' | 'boardgamegeek'
   external_id: string
   title: string
   cover_image_url: string | null
   product_url: string
   price: number | null
   in_stock: boolean | null
+  year_published?: number | null
 }
 
 export type BoardGameSearchResult = BoardGameRecord | BoardGameProviderResult

@@ -36,6 +36,11 @@ def active_event(db: Session, event_id: str) -> Event:
     return event
 
 
+def event_date_has_passed(event: Event) -> bool:
+    event_date = event.end_date or event.start_date
+    return event_date is not None and event_date < datetime.now(UTC).date()
+
+
 def validate_schedule(event: Event, club: Club) -> None:
     if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK}:
         return
@@ -227,15 +232,11 @@ async def create_club_event(
         end_date=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.end_date,
         start_time=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.start_time,
         end_time=None if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK} else payload.end_time,
-        status=(
-            EventStatus.HELD
-            if club.club_type in {ClubType.MOVIE, ClubType.BOARD_GAMES, ClubType.BOOK}
-            and payload.start_date is not None
-            and payload.start_date <= datetime.now(UTC).date()
-            else EventStatus.SCHEDULED
-        ),
+        status=EventStatus.SCHEDULED,
         created_by=profile.id,
     )
+    if event_date_has_passed(event):
+        event.status = EventStatus.HELD
     db.add(event)
     db.commit()
     db.refresh(event)
@@ -283,6 +284,8 @@ async def update_event(
         event.avatar_url = movie.cover_image_url
     if club.club_type == ClubType.BOARD_GAMES and event.linked_item_id is None:
         raise HTTPException(status_code=422, detail="Select a game from the board game catalog")
+    if event_date_has_passed(event):
+        event.status = EventStatus.HELD
     db.commit()
     db.refresh(event)
     return to_event_response(db, event, club)

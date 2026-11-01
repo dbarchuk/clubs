@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { CalendarClock, Check, Clock, Settings, X } from 'lucide-react'
+import { CalendarClock, Check, Clock, Pencil, X } from 'lucide-react'
 import { useI18n } from '../lib/i18n-context'
 import { catalogLocaleForQuery, localizedBoardGameDescription, localizedBoardGameTitle, localizedBookTitle, localizedMovieTitle } from '../lib/catalog-localization'
 import { ReviewPanel } from '../reviews/ReviewPanel'
@@ -45,7 +45,6 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [searchingMovies, setSearchingMovies] = useState(false)
   const [savingMovie, setSavingMovie] = useState(false)
   const [activeMovieStatusEditor, setActiveMovieStatusEditor] = useState<string | null>(null)
-  const [activeEventActionsEditor, setActiveEventActionsEditor] = useState<string | null>(null)
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -62,6 +61,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
   const [hasSearchedTmdbMovies, setHasSearchedTmdbMovies] = useState(false)
   const [selectedMovie, setSelectedMovie] = useState<MovieRecord | MovieSearchResult | null>(null)
   const [boardGameQuery, setBoardGameQuery] = useState('')
+  const [localBoardGameResults, setLocalBoardGameResults] = useState<BoardGameRecord[]>([])
+  const [hasSearchedLocalBoardGames, setHasSearchedLocalBoardGames] = useState(false)
   const [boardGameUkrainianTitle, setBoardGameUkrainianTitle] = useState('')
   const [boardGameUkrainianDescription, setBoardGameUkrainianDescription] = useState('')
   const [boardGameResults, setBoardGameResults] = useState<BoardGameSearchResult[]>([])
@@ -127,6 +128,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     setHasSearchedTmdbMovies(false)
     setSelectedMovie(null)
     setBoardGameQuery('')
+    setLocalBoardGameResults([])
+    setHasSearchedLocalBoardGames(false)
     setBoardGameUkrainianTitle('')
     setBoardGameUkrainianDescription('')
     setBoardGameResults([])
@@ -175,14 +178,14 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     }
   }
 
-  const searchBoardGames = async () => {
+  const searchBoardGames = async (provider: 'geekach' | 'boardgamegeek') => {
     const query = boardGameQuery.trim()
     if (!query) return
     setSearchingBoardGames(true)
     setError('')
     setBoardGameResults([])
     try {
-      const response = await fetch(`/api/board-games?title=${encodeURIComponent(query)}`, {
+      const response = await fetch(`/api/board-games/${provider === 'geekach' ? 'geekach' : 'boardgamegeek'}?title=${encodeURIComponent(query)}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       })
       if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSearchError')))
@@ -194,10 +197,32 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     }
   }
 
+  const searchLocalBoardGames = async () => {
+    const query = boardGameQuery.trim()
+    if (!query) return
+    setSearchingBoardGames(true)
+    setError('')
+    setBoardGameResults([])
+    setLocalBoardGameResults([])
+    setHasSearchedLocalBoardGames(false)
+    try {
+      const response = await fetch(`/api/board-games/catalog?title=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (!response.ok) throw new Error(await errorMessage(response, t('boardGameSearchError')))
+      setLocalBoardGameResults((await response.json()) as BoardGameRecord[])
+      setHasSearchedLocalBoardGames(true)
+    } catch (searchError) {
+      setError(searchError instanceof Error ? searchError.message : t('boardGameSearchError'))
+    } finally {
+      setSearchingBoardGames(false)
+    }
+  }
+
   const handleBoardGameSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault()
-      void searchBoardGames()
+      void searchLocalBoardGames()
     }
   }
 
@@ -289,6 +314,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       setBoardGameQuery(localizedBoardGameTitle(game, language))
       setBoardGameUkrainianTitle('')
       setBoardGameUkrainianDescription('')
+      setLocalBoardGameResults([])
       setBoardGameResults([])
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : t('boardGameSaveError'))
@@ -301,6 +327,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     if (result.id !== null) {
       setSelectedBoardGame(result)
       setBoardGameQuery(localizedBoardGameTitle(result, language))
+      setLocalBoardGameResults([])
       setBoardGameResults([])
       return
     }
@@ -314,6 +341,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         body: JSON.stringify({
           title: result.title,
           cover_image_url: result.cover_image_url,
+          year_published: result.year_published ?? null,
           translations: boardGameUkrainianTitle.trim() || boardGameUkrainianDescription.trim()
             ? [{ locale: 'uk-UA', title: boardGameUkrainianTitle.trim() || null, description: boardGameUkrainianDescription.trim() || null }]
             : [],
@@ -325,6 +353,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       setBoardGameQuery(localizedBoardGameTitle(game, language))
       setBoardGameUkrainianTitle('')
       setBoardGameUkrainianDescription('')
+      setLocalBoardGameResults([])
       setBoardGameResults([])
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : t('boardGameSaveError'))
@@ -358,7 +387,6 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
 
   const startEditing = (record: EventRecord) => {
     setEditingEvent(record)
-    setActiveEventActionsEditor(null)
     onFormOpenChange(true)
     setTitle(record.title ?? '')
     setLinkedItemId(record.linked_item_id ?? '')
@@ -444,7 +472,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       const response = await fetch(`/api/events/${record.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } })
       if (!response.ok) throw new Error(await errorMessage(response, t('eventDeleteError')))
       await loadEvents()
-      setActiveEventActionsEditor(null)
+      if (editingEvent?.id === record.id) resetForm()
       setNotice(t('eventDeleted'))
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : t('eventDeleteError'))
@@ -462,15 +490,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       setPendingEventStatus(null)
       return
     }
-    setActiveEventActionsEditor(null)
     setActiveMovieStatusEditor(record.id)
     setPendingEventStatus(record.status)
-  }
-
-  const toggleEventActionsEditor = (record: EventRecord) => {
-    setActiveMovieStatusEditor(null)
-    setPendingEventStatus(null)
-    setActiveEventActionsEditor((activeId) => activeId === record.id ? null : record.id)
   }
 
   const cancelEventStatusEdit = () => {
@@ -512,12 +533,11 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     <button
       className="event-actions-icon"
       type="button"
-      aria-label={t('eventActions')}
-      title={t('eventActions')}
-      aria-expanded={activeEventActionsEditor === record.id}
-      onClick={() => toggleEventActionsEditor(record)}
+      aria-label={t('editEvent')}
+      title={t('editEvent')}
+      onClick={() => startEditing(record)}
     >
-      <Settings aria-hidden="true" size={17} />
+      <Pencil aria-hidden="true" size={17} />
     </button>
   ) : null
 
@@ -566,10 +586,6 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
         </select></label>
         <button className="button button-primary" type="button" disabled={!pendingEventStatus || pendingEventStatus === record.status} onClick={() => confirmEventStatus(record)}>OK</button>
         <button className="button button-light" type="button" onClick={cancelEventStatusEdit}>{t('cancel')}</button>
-      </div>}
-      {canManage && activeEventActionsEditor === record.id && <div className="event-card-actions">
-        <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
-        <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
       </div>}
     </li>
     )
@@ -633,10 +649,6 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
             </div>
           </div>
         )}
-        {canManage && activeEventActionsEditor === record.id && <div className="movie-event-card-editor event-actions-panel">
-          <button className="button button-light" type="button" onClick={() => startEditing(record)}>{t('editEvent')}</button>
-          <button className="button button-light" type="button" onClick={() => void removeEvent(record)}>{t('deleteEvent')}</button>
-        </div>}
       </li>
     )
   }
@@ -648,8 +660,14 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
       {notice && <p role="status">{notice}</p>}
       {error && <p className="club-form-error" role="alert">{error}</p>}
       {canManage && formOpen && (
-        <form className="club-create-form" onSubmit={(event) => void saveEvent(event)}>
-          <h3>{editingEvent ? t('editEvent') : t('createEvent')}</h3>
+        <form
+          className={`club-create-form${editingEvent ? ' event-edit-modal' : ''}`}
+          onSubmit={(event) => void saveEvent(event)}
+          role={editingEvent ? 'dialog' : undefined}
+          aria-modal={editingEvent ? 'true' : undefined}
+          aria-labelledby={editingEvent ? 'event-edit-title' : undefined}
+        >
+          <h3 id={editingEvent ? 'event-edit-title' : undefined}>{editingEvent ? t('editEvent') : t('createEvent')}</h3>
           <label className="club-form-field"><span>{t('eventTitle')}</span><input maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
           {clubType === 'movie' ? (
             <div className="movie-picker">
@@ -686,30 +704,48 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
             </div>
           ) : clubType === 'board_games' ? (
             <div className="movie-picker">
-              <label className="club-form-field"><span>{t('searchBoardGames')}</span><input value={boardGameQuery} onChange={(event) => { setBoardGameQuery(event.target.value); setSelectedBoardGame(null); setBoardGameResults([]) }} onKeyDown={handleBoardGameSearchKeyDown} /></label>
+              <label className="club-form-field"><span>{t('searchBoardGames')}</span><input value={boardGameQuery} onChange={(event) => { setBoardGameQuery(event.target.value); setSelectedBoardGame(null); setBoardGameResults([]); setLocalBoardGameResults([]); setHasSearchedLocalBoardGames(false) }} onKeyDown={handleBoardGameSearchKeyDown} /></label>
               {!selectedBoardGame && <>
                 <label className="club-form-field"><span>{t('ukrainianTitle')}</span><input value={boardGameUkrainianTitle} onChange={(event) => setBoardGameUkrainianTitle(event.target.value)} /></label>
                 <label className="club-form-field"><span>{t('ukrainianDescription')}</span><textarea value={boardGameUkrainianDescription} onChange={(event) => setBoardGameUkrainianDescription(event.target.value)} /></label>
               </>}
               <div className="event-form-actions">
-                <button className="button button-light" type="button" onClick={() => void searchBoardGames()} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('search')}</button>
-                <button className="button button-light" type="button" onClick={() => void createBoardGame()} disabled={savingBoardGame || !boardGameQuery.trim()}>{savingBoardGame ? t('saving') : t('createBoardGame')}</button>
+                <button className="button button-light" type="button" onClick={() => void searchLocalBoardGames()} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('searchLocalBoardGames')}</button>
+                {hasSearchedLocalBoardGames && <>
+                  <button className="button button-light" type="button" onClick={() => void searchBoardGames('geekach')} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('searchGeekach')}</button>
+                  <button className="button button-light" type="button" onClick={() => void searchBoardGames('boardgamegeek')} disabled={searchingBoardGames || !boardGameQuery.trim()}>{searchingBoardGames ? t('loading') : t('searchBoardGameGeek')}</button>
+                  <button className="button button-light" type="button" onClick={() => void createBoardGame()} disabled={savingBoardGame || !boardGameQuery.trim()}>{savingBoardGame ? t('saving') : t('createBoardGame')}</button>
+                </>}
               </div>
+              {hasSearchedLocalBoardGames && <a className="boardgamegeek-attribution" href="https://boardgamegeek.com" target="_blank" rel="noreferrer">{t('poweredByBGG')}</a>}
               {selectedBoardGame && (
                 <div className="selected-movie">
                   {selectedBoardGame.cover_image_url && <img src={selectedBoardGame.cover_image_url} alt="" />}
                   <span>{localizedBoardGameTitle(selectedBoardGame, language)}{localizedBoardGameDescription(selectedBoardGame, language) ? ` · ${localizedBoardGameDescription(selectedBoardGame, language)}` : ''}</span>
-                  <button className="button button-light" type="button" onClick={() => { setSelectedBoardGame(null); setBoardGameQuery('') }}>{t('removeSelectedBoardGame')}</button>
+                  <button className="button button-light" type="button" onClick={() => { setSelectedBoardGame(null); setBoardGameQuery(''); setLocalBoardGameResults([]); setBoardGameResults([]); setHasSearchedLocalBoardGames(false) }}>{t('removeSelectedBoardGame')}</button>
                 </div>
               )}
               {savingBoardGame && <p role="status">{t('savingBoardGame')}</p>}
+              {localBoardGameResults.length > 0 && (
+                <ul className="movie-search-results" aria-label={t('boardGameSearchResults')}>
+                  {localBoardGameResults.map((game) => (
+                    <li key={`local-${game.id}`}>
+                      <button type="button" onClick={() => void selectBoardGame(game)} disabled={savingBoardGame}>
+                        {game.cover_image_url && <img src={game.cover_image_url} alt="" />}
+                        <span><strong>{localizedBoardGameTitle(game, language)}</strong><small>{localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}{game.year_published ? ` · ${game.year_published}` : ''}</small></span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {hasSearchedLocalBoardGames && localBoardGameResults.length === 0 && <p>{t('noBoardGameMatches')}</p>}
               {boardGameResults.length > 0 && (
                 <ul className="movie-search-results" aria-label={t('boardGameSearchResults')}>
                   {boardGameResults.map((game) => (
                     <li key={game.id === null ? `${game.provider}-${game.external_id}` : `local-${game.id}`}>
                       <button type="button" onClick={() => void selectBoardGame(game)} disabled={savingBoardGame}>
                         {game.cover_image_url && <img src={game.cover_image_url} alt="" />}
-                        <span><strong>{game.id === null ? game.title : localizedBoardGameTitle(game, language)}</strong><small>{game.id === null ? `${t('boardGameFromGeekach')}${game.price === null ? '' : ` · ${game.price} ₴`}${game.in_stock === false ? ` · ${t('unavailable')}` : ''}` : localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}</small></span>
+                        <span><strong>{game.id === null ? game.title : localizedBoardGameTitle(game, language)}</strong><small>{game.id === null ? `${game.provider === 'geekach' ? t('boardGameFromGeekach') : t('boardGameFromBGG')}${game.year_published ? ` · ${game.year_published}` : ''}${game.price === null ? '' : ` · ${game.price} ₴`}${game.in_stock === false ? ` · ${t('unavailable')}` : ''}` : localizedBoardGameDescription(game, language) || t('boardGameAlreadySaved')}</small></span>
                       </button>
                     </li>
                   ))}
@@ -751,7 +787,8 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
               <label className="club-form-field"><span>{t('endTime')}</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
             </>}
           </div>
-          <div className="event-form-actions">
+          <div className={`event-form-actions${editingEvent ? ' event-edit-actions' : ''}`}>
+            {editingEvent && <button className="button event-delete-button" type="button" onClick={() => void removeEvent(editingEvent)}>{t('deleteEvent')}</button>}
             <button className="button button-primary" type="submit" disabled={saving || savingMovie || savingBoardGame || savingBook}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
             {editingEvent && <button className="button button-light" type="button" onClick={resetForm}>{t('cancelEditEvent')}</button>}
           </div>

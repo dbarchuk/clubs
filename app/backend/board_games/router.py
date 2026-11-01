@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.backend.board_games.models import BoardGame, BoardGameTranslation
 from app.backend.reviews.models import BoardGameReview
-from app.backend.board_games.clients import GeekachBoardGameClient
+from app.backend.board_games.clients import BoardGameGeekClient, GeekachBoardGameClient
 from app.backend.board_games.schemas import (
     BoardGameCreate,
     BoardGameClubReference,
@@ -24,10 +24,12 @@ from app.backend.events.models import Event, EventStatus
 from app.backend.users.models import Profile
 from app.backend.users.router import get_active_profile, is_superuser_email
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.logging import log_external_error
 
 router = APIRouter(prefix="/board-games", tags=["board-games"])
 geekach_client = GeekachBoardGameClient()
+bgg_client = BoardGameGeekClient(settings.boardgame_geek_api_key)
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +68,59 @@ async def search_board_games(
             ) from exc
         provider_results = []
     return [*local_results, *provider_results]
+
+
+@router.get("/catalog", response_model=list[BoardGameResponse])
+async def search_local_board_game_catalog(
+    title: Annotated[str, Query(min_length=1, max_length=200)],
+    _: Annotated[Profile, Depends(get_active_profile)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[BoardGameResponse]:
+    normalized_title = title.strip()
+    if not normalized_title:
+        raise HTTPException(status_code=422, detail="Title must not be blank")
+    games = db.scalars(
+        select(BoardGame)
+        .outerjoin(BoardGameTranslation)
+        .where(
+            or_(
+                func.lower(BoardGame.title).contains(normalized_title.lower()),
+                func.lower(BoardGameTranslation.title).contains(normalized_title.lower()),
+            )
+        )
+        .distinct()
+        .order_by(BoardGame.title, BoardGame.year_published)
+    ).all()
+    return [BoardGameResponse.model_validate(game) for game in games]
+
+
+@router.get("/geekach", response_model=list[BoardGameProviderResult])
+async def search_geekach_board_games(
+    title: Annotated[str, Query(min_length=1, max_length=200)],
+    _: Annotated[Profile, Depends(get_active_profile)],
+) -> list[BoardGameProviderResult]:
+    try:
+        return await geekach_client.search(title.strip())
+    except (httpx.HTTPError, ValueError) as exc:
+        log_external_error(logger, "Geekach board game search failed", exc)
+        raise HTTPException(status_code=502, detail="Geekach search is temporarily unavailable") from exc
+
+
+@router.get("/boardgamegeek", response_model=list[BoardGameProviderResult])
+async def search_boardgamegeek_games(
+    title: Annotated[str, Query(min_length=1, max_length=200)],
+    _: Annotated[Profile, Depends(get_active_profile)],
+) -> list[BoardGameProviderResult]:
+    try:
+        return await bgg_client.search(title.strip())
+    except ValueError as exc:
+        if "not configured" in str(exc):
+            raise HTTPException(status_code=503, detail="BoardGameGeek API key is not configured") from exc
+        log_external_error(logger, "BoardGameGeek search failed", exc)
+        raise HTTPException(status_code=502, detail="BoardGameGeek search is temporarily unavailable") from exc
+    except httpx.HTTPError as exc:
+        log_external_error(logger, "BoardGameGeek search failed", exc)
+        raise HTTPException(status_code=502, detail="BoardGameGeek search is temporarily unavailable") from exc
 
 
 @router.get("/library", response_model=list[LibraryBoardGameResponse])

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     tmdb_api_key: SecretStr | None = None
     # Contains a Google Books API key (or OAuth access token), not an OAuth client secret.
     google_books_api_secret: SecretStr | None = None
+    boardgame_geek_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("BOARDGAME_GEEK_API_KEY", "boardgame_geek_api_key"),
+    )
     superuser_emails: list[str] = Field(
         default_factory=lambda: ["dvbarchuk@gmail.com"]
     )
