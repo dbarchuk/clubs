@@ -19,6 +19,9 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.fastapi]
+entrypoint = "app.main:app"
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
