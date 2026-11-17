@@ -33,7 +33,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Deploy to FastAPI Cloud
-        run: uv run fastapi deploy
+        run: |
+          if [ -z "$FASTAPI_CLOUD_APP_ID" ]; then
+            echo "::error::FASTAPI_CLOUD_APP_ID is missing. Add it as a GitHub Actions repository secret."
+            exit 1
+          fi
+          uv run fastapi deploy --app-id "$FASTAPI_CLOUD_APP_ID"
         env:
           FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
           FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}
