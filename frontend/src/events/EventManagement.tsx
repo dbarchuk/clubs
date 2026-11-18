@@ -23,6 +23,9 @@ interface EventManagementProps {
   clubType: 'book' | 'movie' | 'sport' | 'board_games'
   accessToken: string
   canManage: boolean
+  canCreateEvents: boolean
+  isPrivate: boolean
+  profileId: string
   formOpen: boolean
   onFormOpenChange: (open: boolean) => void
 }
@@ -37,7 +40,7 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
   return fallback
 }
 
-export function EventManagement({ clubId, clubType, accessToken, canManage, formOpen, onFormOpenChange }: EventManagementProps) {
+export function EventManagement({ clubId, clubType, accessToken, canManage, canCreateEvents, isPrivate, profileId, formOpen, onFormOpenChange }: EventManagementProps) {
   const { t, language } = useI18n()
   const [events, setEvents] = useState<EventRecord[]>([])
   const [loading, setLoading] = useState(true)
@@ -539,6 +542,16 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     >
       <Pencil aria-hidden="true" size={17} />
     </button>
+  ) : isPrivate && record.created_by === profileId ? (
+    <button
+      className="event-actions-icon"
+      type="button"
+      aria-label={t('editEvent')}
+      title={t('editEvent')}
+      onClick={() => startEditing(record)}
+    >
+      <Pencil aria-hidden="true" size={17} />
+    </button>
   ) : null
 
   const renderEventRating = (record: EventRecord) => record.my_rating !== null && record.my_rating !== undefined ? (
@@ -659,7 +672,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
     <section className="event-management" aria-label={t('clubEvents')}>
       {notice && <p role="status">{notice}</p>}
       {error && <p className="club-form-error" role="alert">{error}</p>}
-      {canManage && formOpen && (
+      {canCreateEvents && formOpen && (
         <form
           className={`club-create-form${editingEvent ? ' event-edit-modal' : ''}`}
           onSubmit={(event) => void saveEvent(event)}
@@ -788,7 +801,7 @@ export function EventManagement({ clubId, clubType, accessToken, canManage, form
             </>}
           </div>
           <div className={`event-form-actions${editingEvent ? ' event-edit-actions' : ''}`}>
-            {editingEvent && <button className="button event-delete-button" type="button" onClick={() => void removeEvent(editingEvent)}>{t('deleteEvent')}</button>}
+            {editingEvent && canManage && <button className="button event-delete-button" type="button" onClick={() => void removeEvent(editingEvent)}>{t('deleteEvent')}</button>}
             <button className="button button-primary" type="submit" disabled={saving || savingMovie || savingBoardGame || savingBook}>{saving ? t('saving') : editingEvent ? t('saveEventChanges') : t('createEvent')}</button>
             {editingEvent && <button className="button button-light" type="button" onClick={resetForm}>{t('cancelEditEvent')}</button>}
           </div>

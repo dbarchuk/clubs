@@ -120,3 +120,5 @@ The backend supports authenticated club creation and paginated listing. It now a
 Selecting a club title from the member club list opens that club's details page. Members see club events there. Owners and admins have a **Club management** button that opens a separate management page. Owners and club admins can edit club type, title, and avatar URL. Only the owner can delete a club.
 
 The management page lists club members and their access types. The owner can assign or remove admins and moderators. Admins can assign admins and assign or remove moderators, but cannot remove or demote an admin. No user can change their own role, and the owner role cannot be reassigned.
+
+For private clubs, every member can create events and edit events they created. Only the owner or an admin can edit another member's events, change event statuses, or delete events. For public clubs, event creation and editing are limited to owners and admins.

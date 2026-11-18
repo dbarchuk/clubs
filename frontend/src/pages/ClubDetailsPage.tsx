@@ -19,7 +19,7 @@ async function responseError(response: Response, fallback: string): Promise<stri
 
 export function ClubDetailsPage() {
   const { clubId } = useParams()
-  const { session } = useAuth()
+  const { session, profile } = useAuth()
   const { t } = useI18n()
   const accessToken = session?.access_token
   const [club, setClub] = useState<ClubRecord | null>(null)
@@ -48,12 +48,13 @@ export function ClubDetailsPage() {
   if (!club || !clubId || !accessToken) return null
 
   const canManage = club.my_access_type === 'owner' || club.my_access_type === 'admin'
+  const canCreateEvents = canManage || !club.is_public
 
   return (
     <section className="club-details-page" aria-labelledby="club-details-title">
       <nav className="club-details-actions" aria-label={t('clubDetails')}>
         <Link className="button button-light" to="/my-clubs"><ArrowLeft aria-hidden="true" size={16} />{t('backToMyClubs')}</Link>
-        {canManage && !eventFormOpen && (
+        {canCreateEvents && !eventFormOpen && (
           <button className="button button-primary" type="button" onClick={() => setEventFormOpen(true)}>
             <Plus aria-hidden="true" size={16} />{t('createEvent')}
           </button>
@@ -73,6 +74,9 @@ export function ClubDetailsPage() {
         clubType={club.club_type}
         accessToken={accessToken}
         canManage={canManage}
+        canCreateEvents={canCreateEvents}
+        isPrivate={!club.is_public}
+        profileId={profile?.id ?? ''}
         formOpen={eventFormOpen}
         onFormOpenChange={setEventFormOpen}
       />

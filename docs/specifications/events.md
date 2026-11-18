@@ -10,9 +10,9 @@ Events let a club plan a shared activity, such as meeting to discuss a book or w
 ## Actors and permissions
 
 - **Club member:** Can view events belonging to clubs they are a member of.
-- **Event manager:** Can create, edit, cancel, delay, or mark an event as held.
-
-The exact event-manager roles and whether every member can manage events need confirmation (see Open questions).
+- **Private-club member:** Can create events and edit events they created. Members cannot change event status or delete events.
+- **Club owner or admin:** Can create, edit, change the status of, and delete any event in the club.
+- **Public-club member who is not an owner or admin:** Can view events but cannot create or edit them.
 
 ## Event lifecycle
 
@@ -84,9 +84,12 @@ If delayed-event schedule history is required, store the prior and revised sched
 
 - Create an event for a club.
 - Open the creation form from a Create event button. Show upcoming events, the movie queue where applicable, and held events in separate sections.
+- For private clubs, allow every member to create an event; allow a member to edit only events they created.
+- For public clubs, event creation and editing are limited to owners and admins.
+- Owners and admins can edit, change the status of, or delete any event. Members cannot change status or delete events, including events they created.
 - For movie clubs, allow creation with no start date to add an item to the queue; create entries with a past start date as held.
-- For book clubs, let managers select a saved book and create a queue entry without a date or a dated entry with a single start date.
-- For board game clubs, let managers select an existing game or create a catalog game by title, then create an event with the game's title and cover and an optional single start date.
+- For book clubs, let club members select a saved book and create a queue entry without a date or a dated entry with a single start date.
+- For board game clubs, let club members select an existing game or create a catalog game by title, then create an event with the game's title and cover and an optional single start date.
 - List and view events for a club, subject to club membership and visibility.
 - Represent all-day and timed events, including events spanning more than one date.
 - Optionally associate an event with a generic catalog item and derive its displayed title when no custom title was entered.
@@ -107,12 +110,13 @@ If delayed-event schedule history is required, store the prior and revised sched
 8. A deleted event has `status = deleted`, a deletion timestamp, and the profile that deleted it; normal event listings do not return it.
 9. The generic item reference can support additional catalog item kinds without renaming the event field. An associated item's image may be shown as the event avatar.
 10. Event creation begins from a button, and event lists are separated into upcoming, queue (movie and book clubs), and held sections. Movie, book, and board game entries created with a past start date have `held` status.
+11. Any member of a private club can create events and edit their own events. Only the event creator or a club owner/admin can edit an event; only owners/admins can change its status or delete it.
+12. Public-club event creation and editing remain limited to owners and admins.
 
 ## Open questions
 
-1. Which roles may create and manage events: all members, or only owners/admins/moderators?
-2. Does “delayed” require a revised date/time immediately, and should the event retain its original date/time in history?
-3. Should a held event be set manually by a manager, automatically after its end time, or either?
-4. What time zone applies to a club, and should an event store a time-zone identifier?
-5. What catalog or external source will provide item records and identifiers, and will items live in one catalog table or separate tables?
-6. Can members RSVP or see an attendee list? That behavior is not included in this draft.
+1. Does “delayed” require a revised date/time immediately, and should the event retain its original date/time in history?
+2. Should a held event be set manually by a manager, automatically after its end time, or either?
+3. What time zone applies to a club, and should an event store a time-zone identifier?
+4. What catalog or external source will provide item records and identifiers, and will items live in one catalog table or separate tables?
+5. Can members RSVP or see an attendee list? That behavior is not included in this draft.

@@ -9,7 +9,7 @@ from app.backend.board_games.models import BoardGame
 from app.backend.board_games.schemas import BoardGameResponse
 from app.backend.books.models import Book
 from app.backend.books.schemas import BookResponse
-from app.backend.clubs.models import Club, ClubType
+from app.backend.clubs.models import Club, ClubMember, ClubMemberAccessType, ClubType
 from app.backend.clubs.permissions import require_manager, require_member
 from app.backend.events.models import Event, EventStatus
 from app.backend.events.schemas import EventCreate, EventResponse, EventUpdate
@@ -21,6 +21,16 @@ from app.backend.users.router import get_active_profile
 from app.core.database import get_db
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+def is_event_manager(db: Session, club_id: str, profile_id: str) -> bool:
+    access_type = db.scalar(
+        select(ClubMember.access_type).where(
+            ClubMember.club_id == club_id,
+            ClubMember.user_id == profile_id,
+        )
+    )
+    return access_type in {ClubMemberAccessType.OWNER, ClubMemberAccessType.ADMIN}
 
 
 def active_event(db: Session, event_id: str) -> Event:
@@ -196,7 +206,9 @@ async def create_club_event(
     profile: Annotated[Profile, Depends(get_active_profile)],
     db: Annotated[Session, Depends(get_db)],
 ) -> EventResponse:
-    club = require_manager(db, club_id, profile.id)
+    club = require_member(db, club_id, profile.id)
+    if club.is_public:
+        require_manager(db, club_id, profile.id)
     if club.club_type == ClubType.MOVIE and payload.linked_item_id is None:
         raise HTTPException(status_code=422, detail="Select a movie from the movie catalog")
     movie = validate_movie_link(db, club, payload.linked_item_id)
@@ -251,8 +263,21 @@ async def update_event(
     db: Annotated[Session, Depends(get_db)],
 ) -> EventResponse:
     event = active_event(db, event_id)
-    club = require_manager(db, event.club_id, profile.id)
+    club = require_member(db, event.club_id, profile.id)
     changes = payload.model_dump(exclude_unset=True)
+    is_manager = is_event_manager(db, club.id, profile.id)
+    if club.is_public and not is_manager:
+        raise HTTPException(status_code=403, detail="Club manager access is required")
+    if not is_manager and event.created_by != profile.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the event creator or a club manager can edit this event",
+        )
+    if not is_manager and "status" in changes:
+        raise HTTPException(
+            status_code=403,
+            detail="Club manager access is required to change event status",
+        )
     if "avatar_url" in changes:
         event.avatar_url = str(changes["avatar_url"]) if changes["avatar_url"] else None
         changes.pop("avatar_url")
