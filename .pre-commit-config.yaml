@@ -1,9 +1,15 @@
 repos:
   - repo: local
     hooks:
-      - id: ruff-check-fix
-        name: Ruff check with fixes
-        entry: uv run --project . ruff check --fix
+      - id: lint
+        name: Lint backend and frontend
+        entry: make lint
         language: system
-        types: [python]
-        require_serial: true
+        pass_filenames: false
+        always_run: true
+      - id: test
+        name: Run backend tests
+        entry: make test
+        language: system
+        pass_filenames: false
+        always_run: true

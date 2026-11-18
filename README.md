@@ -47,11 +47,22 @@ Install the Git hook after running `make install`:
 uv run pre-commit install
 ```
 
-On each commit, the hook runs `ruff check --fix` on staged Python files and applies safe fixes. Review and stage any changes Ruff makes before committing. To run it manually on all Python files:
+Every commit runs backend and frontend linting (`make lint`) followed by the backend test suite (`make test`). A failing check blocks the commit; the hooks do not modify files. Run the same checks manually with:
 
 ```sh
-uv run pre-commit run --all-files
+make lint
+make test
 ```
+
+## Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) with a concise, imperative summary:
+
+```text
+<type>(<scope>): <summary>
+```
+
+For example: `fix(events): reject invalid event dates`. Use a scope when it adds useful context; common types include `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, and `ci`. Keep each commit focused on one logical change, explain motivation or behavior in the body when the summary is not enough, and include relevant tests, documentation, and Alembic migrations. Never commit secrets, credentials, or local `.env` files.
 
 ## Deploy on a Google Cloud VM
 

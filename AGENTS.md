@@ -245,9 +245,11 @@ alembic upgrade head
 ## 🔄 Cross-Cutting Conventions
 
 ### Git
-- Commit with descriptive messages
-- Never commit `.env` — use `.env.example` for template
-- Include migration files in every commit that touches the database schema
+- Use Conventional Commit messages: `<type>(<scope>): <imperative summary>` (for example, `fix(events): reject invalid event dates`). Keep the summary concise; use a scope when it adds useful context.
+- Keep each commit focused on one logical change. Explain motivation or behavior in the body when the summary is not enough.
+- Include relevant tests, documentation, and Alembic migrations in the commit; schema changes must include their migration.
+- Never commit secrets, credentials, or local `.env` files — use `.env.example` for templates.
+- Before committing, run `make lint` and `make test`. The pre-commit hook runs both checks and blocks commits when either fails.
 
 ### Environment
 - Backend runs on port 8000 (configurable via `PORT`)
