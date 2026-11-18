@@ -14,6 +14,14 @@ from app.frontend import router as frontend_router
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
+sentry_dsn = (
+    settings.sentry_dsn.get_secret_value().strip() if settings.sentry_dsn else ""
+)
+if sentry_dsn:
+    import sentry_sdk
+
+    sentry_sdk.init(dsn=sentry_dsn)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:

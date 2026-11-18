@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("BOARDGAME_GEEK_API_KEY", "boardgame_geek_api_key"),
     )
+    sentry_dsn: SecretStr | None = None
     superuser_emails: list[str] = Field(
         default_factory=lambda: ["dvbarchuk@gmail.com"]
     )
