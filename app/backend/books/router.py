@@ -164,6 +164,8 @@ async def list_library_books(
     year_from: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     year_to: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     sort: Literal["date_added", "year_released"] = "date_added",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> list[LibraryBookResponse]:
     if year_from is not None and year_to is not None and year_from > year_to:
         raise HTTPException(status_code=422, detail="year_from must be on or before year_to")
@@ -181,8 +183,9 @@ async def list_library_books(
         if sort == "date_added"
         else Book.published_date.desc().nulls_last(),
         Book.title,
+        Book.id,
     )
-    books = db.scalars(query).all()
+    books = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
     ratings = dict(
         db.execute(
             select(BookReview.book_id, BookReview.rating).where(

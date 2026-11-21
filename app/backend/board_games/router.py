@@ -131,6 +131,8 @@ async def list_library_board_games(
     year_from: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     year_to: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     sort: Literal["date_added", "year_released"] = "date_added",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> list[LibraryBoardGameResponse]:
     if year_from is not None and year_to is not None and year_from > year_to:
         raise HTTPException(status_code=422, detail="year_from must be on or before year_to")
@@ -150,8 +152,9 @@ async def list_library_board_games(
         if sort == "date_added"
         else BoardGame.year_published.desc().nulls_last(),
         BoardGame.title,
+        BoardGame.id,
     )
-    games = db.scalars(query).all()
+    games = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
     ratings = dict(
         db.execute(
             select(BoardGameReview.board_game_id, BoardGameReview.rating).where(

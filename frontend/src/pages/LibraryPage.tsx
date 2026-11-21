@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { BookOpen, Dice5, Film } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../lib/auth-context'
@@ -30,15 +30,15 @@ interface LibraryFiltersProps {
 function LibraryFilters({ scope, setScope, yearFrom, setYearFrom, yearTo, setYearTo, sort, setSort }: LibraryFiltersProps) {
   const { t } = useI18n()
   return (
-    <details className="library-filters">
-      <summary>{t('libraryFilters')}</summary>
+    <section className="library-filters" aria-label={t('libraryFilters')}>
       <div className="library-filter-grid">
-        <label>{t('libraryScope')}
-          <select value={scope} onChange={(event) => setScope(event.target.value as LibraryScope)}>
-            <option value="mine">{t('libraryMine')}</option>
-            <option value="all">{t('libraryAll')}</option>
-          </select>
-        </label>
+        <div className="library-scope-control" role="group" aria-label={t('libraryScope')}>
+          <span>{t('libraryScope')}</span>
+          <div className="library-scope-toggle">
+            <button type="button" aria-pressed={scope === 'mine'} onClick={() => setScope('mine')}>{t('libraryMine')}</button>
+            <button type="button" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>{t('libraryAll')}</button>
+          </div>
+        </div>
         <label>{t('yearFrom')}<input type="number" min={1000} max={2200} value={yearFrom} onChange={(event) => setYearFrom(event.target.value)} /></label>
         <label>{t('yearTo')}<input type="number" min={1000} max={2200} value={yearTo} onChange={(event) => setYearTo(event.target.value)} /></label>
         <label>{t('librarySort')}
@@ -48,7 +48,7 @@ function LibraryFilters({ scope, setScope, yearFrom, setYearFrom, yearTo, setYea
           </select>
         </label>
       </div>
-    </details>
+    </section>
   )
 }
 
@@ -112,6 +112,13 @@ export function LibraryPage() {
   const [movies, setMovies] = useState<LibraryMovie[]>([])
   const [boardGames, setBoardGames] = useState<LibraryBoardGame[]>([])
   const [books, setBooks] = useState<LibraryBook[]>([])
+  const [moviePage, setMoviePage] = useState(1)
+  const [bookPage, setBookPage] = useState(1)
+  const [boardGamePage, setBoardGamePage] = useState(1)
+  const [movieHasMore, setMovieHasMore] = useState(true)
+  const [bookHasMore, setBookHasMore] = useState(true)
+  const [boardGameHasMore, setBoardGameHasMore] = useState(true)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(true)
   const [boardGamesLoading, setBoardGamesLoading] = useState(true)
   const [booksLoading, setBooksLoading] = useState(true)
@@ -122,7 +129,7 @@ export function LibraryPage() {
   const [search, setSearch] = useState('')
   const [boardGameSearch, setBoardGameSearch] = useState('')
   const [bookSearch, setBookSearch] = useState('')
-  const [scope, setScope] = useState<LibraryScope>('all')
+  const [scope, setScope] = useState<LibraryScope>('mine')
   const [yearFrom, setYearFrom] = useState('')
   const [yearTo, setYearTo] = useState('')
   const [sort, setSort] = useState<LibrarySort>('date_added')
@@ -138,6 +145,17 @@ export function LibraryPage() {
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null)
   const isAdmin = profile?.is_admin === true
   const isSuperuser = profile?.is_superuser === true
+  const resetLibraryResults = useCallback(() => {
+    setMoviePage(1)
+    setBookPage(1)
+    setBoardGamePage(1)
+    setMovies([])
+    setBooks([])
+    setBoardGames([])
+    setMovieHasMore(true)
+    setBookHasMore(true)
+    setBoardGameHasMore(true)
+  }, [])
   const libraryQuery = useMemo(() => {
     const params = new URLSearchParams({ scope, sort })
     if (isValidYear(yearFrom)) params.set('year_from', yearFrom)
@@ -329,18 +347,18 @@ export function LibraryPage() {
     setLoading(true)
     // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
     setError('')
-    void fetch(`/api/movies/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+    void fetch(`/api/movies/library?${libraryQuery}&page=${moviePage}&page_size=30`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
         return response.json() as Promise<LibraryMovie[]>
       })
-      .then((result) => { if (!cancelled) setMovies(result) })
+      .then((result) => { if (!cancelled) { setMovies((current) => moviePage === 1 ? result : [...current, ...result]); setMovieHasMore(result.length === 30) } })
       .catch((loadError: unknown) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : t('libraryLoadError'))
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [accessToken, libraryQuery, t])
+  }, [accessToken, libraryQuery, moviePage, t])
 
   useEffect(() => {
     if (!accessToken) return
@@ -349,18 +367,18 @@ export function LibraryPage() {
     setBooksLoading(true)
     // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
     setBooksError('')
-    void fetch(`/api/books/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+    void fetch(`/api/books/library?${libraryQuery}&page=${bookPage}&page_size=30`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
         return response.json() as Promise<LibraryBook[]>
       })
-      .then((result) => { if (!cancelled) setBooks(result) })
+      .then((result) => { if (!cancelled) { setBooks((current) => bookPage === 1 ? result : [...current, ...result]); setBookHasMore(result.length === 30) } })
       .catch((loadError: unknown) => {
         if (!cancelled) setBooksError(loadError instanceof Error ? loadError.message : t('libraryLoadError'))
       })
       .finally(() => { if (!cancelled) setBooksLoading(false) })
     return () => { cancelled = true }
-  }, [accessToken, libraryQuery, t])
+  }, [accessToken, libraryQuery, bookPage, t])
 
   useEffect(() => {
     if (!accessToken) return
@@ -369,18 +387,31 @@ export function LibraryPage() {
     setBoardGamesLoading(true)
     // oxlint-disable-next-line react/set-state-in-effect -- Clears the previous request error.
     setBoardGamesError('')
-    void fetch(`/api/board-games/library?${libraryQuery}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+    void fetch(`/api/board-games/library?${libraryQuery}&page=${boardGamePage}&page_size=30`, { headers: { Authorization: `Bearer ${accessToken}` } })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorMessage(response, t('libraryLoadError')))
         return response.json() as Promise<LibraryBoardGame[]>
       })
-      .then((result) => { if (!cancelled) setBoardGames(result) })
+      .then((result) => { if (!cancelled) { setBoardGames((current) => boardGamePage === 1 ? result : [...current, ...result]); setBoardGameHasMore(result.length === 30) } })
       .catch((loadError: unknown) => {
         if (!cancelled) setBoardGamesError(loadError instanceof Error ? loadError.message : t('libraryLoadError'))
       })
       .finally(() => { if (!cancelled) setBoardGamesLoading(false) })
     return () => { cancelled = true }
-  }, [accessToken, libraryQuery, t])
+  }, [accessToken, libraryQuery, boardGamePage, t])
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      if (activeTab === 'movies' && movieHasMore && !loading) setMoviePage((page) => page + 1)
+      if (activeTab === 'books' && bookHasMore && !booksLoading) setBookPage((page) => page + 1)
+      if (activeTab === 'board-games' && boardGameHasMore && !boardGamesLoading) setBoardGamePage((page) => page + 1)
+    }, { rootMargin: '300px' })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [activeTab, boardGameHasMore, boardGamesLoading, bookHasMore, booksLoading, loading, movieHasMore])
 
   return (
     <section className="library-page" aria-labelledby="library-title">
@@ -410,7 +441,16 @@ export function LibraryPage() {
       </div>
 
       <section hidden={activeTab !== 'movies'} className="library-section" id="library-panel-movies" role="tabpanel" aria-labelledby="library-tab-movies" tabIndex={0}>
-        <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
+      <LibraryFilters
+        scope={scope}
+        setScope={(value) => { resetLibraryResults(); setScope(value) }}
+        yearFrom={yearFrom}
+        setYearFrom={(value) => { resetLibraryResults(); setYearFrom(value) }}
+        yearTo={yearTo}
+        setYearTo={(value) => { resetLibraryResults(); setYearTo(value) }}
+        sort={sort}
+        setSort={(value) => { resetLibraryResults(); setSort(value) }}
+      />
         <label className="library-search">
           <span className="visually-hidden">{t('librarySearchPlaceholder')}</span>
           <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('librarySearchPlaceholder')} />
@@ -603,6 +643,7 @@ export function LibraryPage() {
         onClose={() => setReviewTarget(null)}
         onRatingChange={updateReviewRating}
       />}
+      <div className="library-load-more-sentinel" ref={loadMoreRef} aria-hidden="true" />
     </section>
   )
 }

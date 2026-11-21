@@ -115,6 +115,8 @@ async def list_library_movies(
     year_from: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     year_to: Annotated[int | None, Query(ge=1000, le=2200)] = None,
     sort: Literal["date_added", "year_released"] = "date_added",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 30,
 ) -> list[LibraryMovieResponse]:
     if year_from is not None and year_to is not None and year_from > year_to:
         raise HTTPException(status_code=422, detail="year_from must be on or before year_to")
@@ -133,8 +135,9 @@ async def list_library_movies(
         if sort == "date_added"
         else Movie.release_date.desc().nulls_last(),
         Movie.title,
+        Movie.id,
     )
-    movies = db.scalars(query).all()
+    movies = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
     ratings = dict(
         db.execute(
             select(MovieReview.movie_id, MovieReview.rating).where(
