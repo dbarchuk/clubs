@@ -514,7 +514,6 @@ export function LibraryPage() {
       )}
 
       <section hidden={activeTab !== 'books'} className="library-section" id="library-panel-books" role="tabpanel" aria-labelledby="library-tab-books" tabIndex={0}>
-        <h2>{t('libraryBooks')}</h2>
         <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
         <label className="library-search">
           <span className="visually-hidden">{t('libraryBookSearchPlaceholder')}</span>
@@ -575,7 +574,6 @@ export function LibraryPage() {
       )}
 
       <section hidden={activeTab !== 'board-games'} className="library-section" id="library-panel-board-games" role="tabpanel" aria-labelledby="library-tab-board-games" tabIndex={0}>
-        <h2>{t('libraryBoardGames')}</h2>
         <LibraryFilters scope={scope} setScope={setScope} yearFrom={yearFrom} setYearFrom={setYearFrom} yearTo={yearTo} setYearTo={setYearTo} sort={sort} setSort={setSort} />
         <label className="library-search">
           <span className="visually-hidden">{t('libraryBoardGameSearchPlaceholder')}</span>
